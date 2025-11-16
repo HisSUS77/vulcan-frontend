@@ -4,12 +4,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 
 const navItems = [
+  { label: "Dashboard", to: "/dashboard", icon: "🏠" },   // ← ADD THIS
   { label: "Repository Integration", to: "/repositories", icon: "📁" },
   { label: "Scan", to: "/scan", icon: "🔍" },
   { label: "Graphs", to: "/graphs", icon: "📊" },
   { label: "Patch Generator", to: "/patch-generator", icon: "🧩" },
   { label: "Reports", to: "/reports", icon: "📄" },
 ];
+
 
 const sampleRepos = ["frontend-app", "backend-service", "utility-lib"];
 
