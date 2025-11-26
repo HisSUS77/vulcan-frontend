@@ -3,15 +3,25 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 
-const navItems = [
-  { label: "Dashboard", to: "/dashboard", icon: "🏠" },   // ← ADD THIS
-  { label: "Repository Integration", to: "/repositories", icon: "📁" },
-  { label: "Scan", to: "/scan", icon: "🔍" },
-  { label: "Graphs", to: "/graphs", icon: "📊" },
-  { label: "Patch Generator", to: "/patch-generator", icon: "🧩" },
-  { label: "Reports", to: "/reports", icon: "📄" },
-];
+// ==== MODERN ICONS (Lucide) ====
+import {
+  LayoutDashboard,
+  FolderGit,
+  ScanSearch,
+  Share2,
+  FileDiff,
+  FileBarChart,
+  Search,
+} from "lucide-react";
 
+const navItems = [
+  { label: "Dashboard", to: "/dashboard", icon: <LayoutDashboard size={20} /> },
+  { label: "Repository Integration", to: "/repositories", icon: <FolderGit size={20} /> },
+  { label: "Scan", to: "/scan", icon: <ScanSearch size={20} /> },
+  { label: "Graphs", to: "/graphs", icon: <Share2 size={20} /> },
+  { label: "Patch Generator", to: "/patch-generator", icon: <FileDiff size={20} /> },
+  { label: "Reports", to: "/reports", icon: <FileBarChart size={20} /> },
+];
 
 const sampleRepos = ["frontend-app", "backend-service", "utility-lib"];
 
@@ -33,7 +43,7 @@ function AppLayout({ children }) {
 
   useEffect(() => {
     const handler = (e) => {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
+      if (!profileRef.current?.contains(e.target)) {
         setProfileOpen(false);
       }
     };
@@ -42,13 +52,13 @@ function AppLayout({ children }) {
   }, []);
 
   const handleLogout = () => {
-    // later: clear real tokens
     localStorage.removeItem("access_token");
     navigate("/login", { replace: true });
   };
 
   return (
     <div className="v-layout">
+      
       {/* Sidebar */}
       <aside className="v-sidebar">
         <div className="v-brand">
@@ -64,8 +74,7 @@ function AppLayout({ children }) {
               key={item.to}
               to={item.to}
               className={
-                "v-nav-item" +
-                (location.pathname === item.to ? " v-nav-item-active" : "")
+                "v-nav-item" + (location.pathname === item.to ? " v-nav-item-active" : "")
               }
             >
               <span className="v-nav-icon">{item.icon}</span>
@@ -81,25 +90,24 @@ function AppLayout({ children }) {
           <h1 className="v-topbar-title">Dashboard</h1>
 
           <div className="v-topbar-right">
-            {/* Search bar */}
+
+            {/* Search */}
             <div className="v-search-wrap">
-              <span className="v-search-icon">🔍</span>
+              <span className="v-search-icon">
+                <Search size={18} />
+              </span>
               <input
                 type="text"
                 placeholder="Search"
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
-                  if (e.target.value.length >= 3) setShowSuggestions(true);
-                  else setShowSuggestions(false);
+                  setShowSuggestions(e.target.value.length >= 3);
                 }}
-                onBlur={() => {
-                  setTimeout(() => setShowSuggestions(false), 150);
-                }}
-                onFocus={() => {
-                  if (search.length >= 3) setShowSuggestions(true);
-                }}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onFocus={() => setShowSuggestions(search.length >= 3)}
               />
+
               {showSuggestions && suggestions.length > 0 && (
                 <div className="v-search-suggestions">
                   {suggestions.map((item) => (
@@ -119,7 +127,7 @@ function AppLayout({ children }) {
               )}
             </div>
 
-            {/* Profile dropdown */}
+            {/* Profile */}
             <div className="v-profile-wrap" ref={profileRef}>
               <button
                 type="button"
@@ -128,12 +136,14 @@ function AppLayout({ children }) {
               >
                 👤
               </button>
+
               {profileOpen && (
                 <div className="v-profile-menu">
                   <div className="v-profile-menu-header">
                     <p className="v-profile-name">Agent Vulcan</p>
                     <p className="v-profile-email">agent@vulcan.ai</p>
                   </div>
+
                   <button type="button">Account settings</button>
                   <button type="button">API keys</button>
                   <button
@@ -146,6 +156,7 @@ function AppLayout({ children }) {
                 </div>
               )}
             </div>
+
           </div>
         </header>
 

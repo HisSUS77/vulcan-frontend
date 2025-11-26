@@ -1,6 +1,8 @@
+// src/App.js
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
+
 import LoginPage from "./pages/loginPage";
 import DashboardPage from "./pages/DashboardPage";
 import ScanPage from "./pages/ScanPage";
@@ -15,10 +17,10 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public */}
+        {/* Public route */}
         <Route path="/login" element={<LoginPage />} />
 
-        {/* Protected area (wrapped by layout) */}
+        {/* Layout-wrapped routes (later we can add auth guard) */}
         <Route
           path="/dashboard"
           element={
