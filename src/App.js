@@ -9,6 +9,7 @@ import GraphsPage from "./pages/GraphsPage";
 import PatchGeneratorPage from "./pages/PatchGeneratorPage";
 import ReportsPage from "./pages/ReportsPage";
 import AppLayout from "./components/layout/AppLayout";
+import RequireAuth from "./components/RequireAuth";
 
 function App() {
   return (
@@ -21,54 +22,66 @@ function App() {
         <Route
           path="/dashboard"
           element={
-            <AppLayout>
-              <DashboardPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <DashboardPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/scan"
           element={
-            <AppLayout>
-              <ScanPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <ScanPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/repositories"
           element={
-            <AppLayout>
-              <RepoIntegrationPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <RepoIntegrationPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/graphs"
           element={
-            <AppLayout>
-              <GraphsPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <GraphsPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/patch-generator"
           element={
-            <AppLayout>
-              <PatchGeneratorPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <PatchGeneratorPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
         <Route
           path="/reports"
           element={
-            <AppLayout>
-              <ReportsPage />
-            </AppLayout>
+            <RequireAuth>
+              <AppLayout>
+                <ReportsPage />
+              </AppLayout>
+            </RequireAuth>
           }
         />
 
-        {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Default redirect: go to login */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
   );

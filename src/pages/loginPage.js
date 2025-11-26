@@ -1,10 +1,16 @@
 // src/pages/LoginPage.js
 import React, { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { api, setAccessToken } from "../api/client";
 import "../App.css";
 
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Production: no default credentials, only real backend auth
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -13,10 +19,25 @@ function LoginPage() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login with:", form);
-    // TODO: call backend login API then redirect to /dashboard
+    try {
+      // Try real backend login first
+      const { data } = await api.post("/auth/login", {
+        email: form.email,
+        password: form.password,
+      });
+      if (data?.access_token) {
+        setAccessToken(data.access_token);
+        const dest = location.state?.from?.pathname || "/dashboard";
+        navigate(dest, { replace: true });
+        return;
+      }
+      throw new Error("No token in response");
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Login failed. Please check your credentials.";
+      alert(msg);
+    }
   };
 
   return (
@@ -76,6 +97,7 @@ function LoginPage() {
           <button type="submit" className="lp-primary-btn">
             Login
           </button>
+          {/* No default credential bypass in production */}
         </form>
 
         {/* Forgot password */}
