@@ -62,7 +62,7 @@ function App() {
           }
         />
         <Route
-          path="/patch-generator"
+          path="/patches"
           element={
             <RequireAuth>
               <AppLayout>

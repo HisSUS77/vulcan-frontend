@@ -19,7 +19,7 @@ const navItems = [
   { label: "Repository Integration", to: "/repositories", icon: <FolderGit size={20} /> },
   { label: "Scan", to: "/scan", icon: <ScanSearch size={20} /> },
   { label: "Graphs", to: "/graphs", icon: <Share2 size={20} /> },
-  { label: "Patch Generator", to: "/patch-generator", icon: <FileDiff size={20} /> },
+  { label: "Patch Generator", to: "/patches", icon: <FileDiff size={20} /> },
   { label: "Reports", to: "/reports", icon: <FileBarChart size={20} /> },
 ];
 
