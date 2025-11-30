@@ -1,0 +1,86 @@
+// src/api/services.js
+import { api } from "./client";
+
+// ============= AUTH =============
+export const authService = {
+  login: (email, password) => api.post("/auth/login", { email, password }),
+  logout: () => api.post("/auth/logout"),
+  me: () => api.get("/auth/me"),
+  refresh: () => api.post("/auth/refresh"),
+};
+
+// ============= DASHBOARD =============
+export const dashboardService = {
+  getSummary: () => api.get("/dashboard/summary"),
+  getRecentScans: () => api.get("/dashboard/recent-scans"),
+};
+
+// ============= NOTIFICATIONS =============
+export const notificationService = {
+  getNotifications: (page = 1, size = 10) =>
+    api.get("/notifications", { params: { page, size } }),
+};
+
+// ============= REPOSITORIES =============
+export const repositoryService = {
+  list: () => api.get("/repositories"),
+  create: (data) => api.post("/repositories", data),
+  get: (id) => api.get(`/repositories/${id}`),
+  delete: (id) => api.delete(`/repositories/${id}`),
+  getBranches: (id) => api.get(`/repositories/${id}/branches`),
+  upload: (id, file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post(`/repositories/${id}/upload`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+};
+
+// ============= SCANS =============
+export const scanService = {
+  list: () => api.get("/scans"),
+  start: (data) => api.post("/scans/start", data),
+  getStatus: (scanId) => api.get(`/scans/${scanId}/status`),
+  getLogs: (scanId) => api.get(`/scans/${scanId}/logs`),
+  getSummary: (scanId) => api.get(`/scans/${scanId}/summary`),
+  cancel: (scanId) => api.post(`/scans/${scanId}/cancel`),
+};
+
+// ============= GRAPHS =============
+export const graphService = {
+  getGraph: (scanId, fileId, type = "AST") =>
+    api.get(`/graphs/${scanId}/file/${fileId}`, { params: { type } }),
+  getNode: (scanId, nodeId) => api.get(`/graphs/${scanId}/nodes/${nodeId}`),
+  getPath: (scanId, pathId) => api.get(`/graphs/${scanId}/paths/${pathId}`),
+};
+
+// ============= PATCHES =============
+export const patchService = {
+  getVulnerabilities: (scanId) =>
+    api.get(`/patches/${scanId}/vulnerabilities`),
+  generate: (data) => api.post("/patches/generate", data),
+  get: (patchId) => api.get(`/patches/${patchId}`),
+  apply: (patchId) => api.post(`/patches/${patchId}/apply`),
+  export: (patchId) => api.post(`/patches/${patchId}/export`),
+  regenerate: (patchId) => api.post(`/patches/${patchId}/regenerate`),
+};
+
+// ============= REPORTS =============
+export const reportService = {
+  list: (params = {}) => api.get("/reports", { params }),
+  get: (reportId) => api.get(`/reports/${reportId}`),
+  export: (reportId, format = "json") =>
+    api.get(`/reports/${reportId}/export`, { params: { format } }),
+  compare: (reportId1, reportId2) =>
+    api.post("/reports/compare", { report_id_1: reportId1, report_id_2: reportId2 }),
+};
+
+// ============= SEMANTIC ANALYSIS (NEW) =============
+export const analysisService = {
+  analyze: (code, language, filename = null) =>
+    api.post("/analysis/analyze", { code, language, filename }),
+  buildGraph: (code, language, filename = null) =>
+    api.post("/analysis/graph", { code, language, filename }),
+  getFindings: () => api.get("/analysis/findings"),
+};

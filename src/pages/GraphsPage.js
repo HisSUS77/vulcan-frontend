@@ -1,7 +1,8 @@
 // src/pages/GraphsPage.js
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo, useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
+import { graphService } from "../api/services";
 
 const GRAPH_TYPES = ["AST", "CFG", "DFG"];
 
@@ -128,81 +129,95 @@ const pathSet = new Set(PATH_NODE_IDS);
 
 function GraphsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scanId = searchParams.get("scanId");
+  const fileId = searchParams.get("fileId") || "file-1";
+  
+  // Redirect to scan page if no scanId provided
+  useEffect(() => {
+    if (!scanId) {
+      // Try to get last scan from sessionStorage
+      const lastScanId = sessionStorage.getItem('lastScanId');
+      if (lastScanId) {
+        navigate(`/graphs?scanId=${lastScanId}&fileId=file-1`);
+      } else {
+        navigate("/scan");
+      }
+    }
+  }, [scanId, navigate]);
 
   const [graphType, setGraphType] = useState("AST");
   const [search, setSearch] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState("center");
   const [showPath, setShowPath] = useState(false);
   const [toast, setToast] = useState("");
+  const [graphData, setGraphData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // compute nice radial layout for nodes
+  useEffect(() => {
+    fetchGraph();
+  }, [graphType, scanId, fileId]);
+
+  const fetchGraph = async () => {
+    setLoading(true);
+    try {
+      const res = await graphService.getGraph(scanId, fileId, graphType);
+      setGraphData(res.data);
+    } catch (err) {
+      console.error("Failed to fetch graph:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // compute nice radial layout for nodes from backend data or mock
   const { nodes, links, nodeMap } = useMemo(() => {
-    // center node at middle of viewBox
-    const centerNode = NODE_META.find((n) => n.isCenter);
-    const others = NODE_META.filter((n) => !n.isCenter);
+    if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+      // Return empty structure when no data
+      return { nodes: [], links: [], nodeMap: {} };
+    }
 
-    const radius = 30; // circle radius in viewBox units
+    const backendNodes = graphData.nodes || [];
+    const backendEdges = graphData.edges || [];
+
+    // center node at middle of viewBox
+    const centerNode = backendNodes.find((n) => n && n.type === "center") || backendNodes[0];
+    const others = backendNodes.filter((n) => n && n.id !== centerNode?.id);
+
+    const radius = 30;
     const centerX = 50;
     const centerY = 50;
 
     const placedNodes = [];
 
-    // push center
-    placedNodes.push({
-      ...centerNode,
-      x: centerX,
-      y: centerY,
-    });
+    if (centerNode) {
+      placedNodes.push({ ...centerNode, x: centerX, y: centerY, isCenter: true });
+    }
 
-    // place others evenly around a circle
     const count = others.length;
     others.forEach((meta, index) => {
-      const angle = (2 * Math.PI * index) / count - Math.PI / 2; // start at top
+      const angle = (2 * Math.PI * index) / count - Math.PI / 2;
       const x = centerX + radius * Math.cos(angle);
       const y = centerY + radius * Math.sin(angle);
-
-      placedNodes.push({
-        ...meta,
-        x,
-        y,
-      });
+      placedNodes.push({ ...meta, x, y, isCenter: false });
     });
 
-    // simple links: center to all + a few cross-links
-    const linkList = [];
-
-    placedNodes.forEach((n) => {
-      if (!n.isCenter) {
-        linkList.push({ source: "center", target: n.id });
-      }
-    });
-
-    // cross links to make it look more real
-    const extraPairs = [
-      ["input", "auth"],
-      ["auth", "router"],
-      ["router", "middleware"],
-      ["input", "sanitize"],
-      ["sanitize", "db_query"],
-      ["db_query", "sink"],
-      ["hash", "db_query"],
-      ["config", "db_query"],
-      ["logger", "sink"],
-    ];
-    extraPairs.forEach(([a, b]) => linkList.push({ source: a, target: b }));
+    const linkList = backendEdges.map((e) => ({
+      source: e.from,
+      target: e.to,
+    }));
 
     const map = {};
     placedNodes.forEach((n) => (map[n.id] = n));
 
     return { nodes: placedNodes, links: linkList, nodeMap: map };
-  }, []);
+  }, [graphData]);
 
-  const selectedNode =
-    NODE_META.find((n) => n.id === selectedNodeId) || NODE_META[0];
+  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || nodes[0] || null;
 
   const filteredNodeIds = search
-    ? NODE_META.filter((n) =>
-        n.label.toLowerCase().includes(search.toLowerCase())
+    ? nodes.filter((n) =>
+        n.label && n.label.toLowerCase().includes(search.toLowerCase())
       ).map((n) => n.id)
     : [];
 
@@ -224,6 +239,10 @@ function GraphsPage() {
     navigate("/scan");
   };
 
+  if (loading) {
+    return <div className="gv-page">Loading graph...</div>;
+  }
+
   return (
     <div className="gv-page">
       {toast && <div className="gv-toast">{toast}</div>}
@@ -231,13 +250,25 @@ function GraphsPage() {
       <div className="gv-top-row">
         <div className="gv-title-wrap">
           <h1 className="gv-title">Graph Visualization</h1>
-          <button
-            type="button"
-            className="gv-back-btn"
-            onClick={handleBackToScan}
-          >
-            ← Back to scan results
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <span style={{ 
+              fontSize: '0.9rem', 
+              color: '#666', 
+              background: '#f0f0f0', 
+              padding: '4px 12px', 
+              borderRadius: '4px',
+              fontFamily: 'monospace'
+            }}>
+              Scan ID: {scanId}
+            </span>
+            <button
+              type="button"
+              className="gv-back-btn"
+              onClick={handleBackToScan}
+            >
+              ← Back to scan results
+            </button>
+          </div>
         </div>
 
         <div className="gv-top-actions">
@@ -427,58 +458,66 @@ function GraphsPage() {
           <div className="gv-inspector-inner">
             <div className="gv-inspector-title">Element Details</div>
 
-            <div className="gv-inspector-section">
-              <div className="gv-inspector-label">Type</div>
-              <div className="gv-inspector-value">
-                Node ({selectedNode.type})
-              </div>
-            </div>
-
-            <div className="gv-inspector-section">
-              <div className="gv-inspector-label">Properties</div>
-              <div className="gv-inspector-props">
-                <div>
-                  <span className="gv-inspector-prop-label">Name</span>
-                  <span className="gv-inspector-prop-value">
-                    {selectedNode.label}
-                  </span>
+            {selectedNode ? (
+              <>
+                <div className="gv-inspector-section">
+                  <div className="gv-inspector-label">Type</div>
+                  <div className="gv-inspector-value">
+                    Node ({selectedNode.type || "unknown"})
+                  </div>
                 </div>
-                <div>
-                  <span className="gv-inspector-prop-label">Scope</span>
-                  <span className="gv-inspector-prop-value">
-                    {selectedNode.scope}
-                  </span>
+
+                <div className="gv-inspector-section">
+                  <div className="gv-inspector-label">Properties</div>
+                  <div className="gv-inspector-props">
+                    <div>
+                      <span className="gv-inspector-prop-label">Name</span>
+                      <span className="gv-inspector-prop-value">
+                        {selectedNode.label || "N/A"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="gv-inspector-prop-label">Scope</span>
+                      <span className="gv-inspector-prop-value">
+                        {selectedNode.scope || "N/A"}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="gv-inspector-section">
-              <div className="gv-inspector-label">Code</div>
-              <div className="gv-code-block">
-                <code>{selectedNode.code}</code>
-              </div>
-            </div>
+                <div className="gv-inspector-section">
+                  <div className="gv-inspector-label">Code</div>
+                  <div className="gv-code-block">
+                    <code>{selectedNode.code || "No code available"}</code>
+                  </div>
+                </div>
 
-            <div className="gv-inspector-section">
-              <div className="gv-inspector-label">
-                AI Insight (why vulnerable)
+                <div className="gv-inspector-section">
+                  <div className="gv-inspector-label">
+                    AI Insight (why vulnerable)
+                  </div>
+                  <div className="gv-ai-insight">
+                    {selectedNode.severity ? (
+                      <>
+                        The variable{" "}
+                        <span className="gv-highlight">
+                          {selectedNode.label}
+                        </span>{" "}
+                        is marked <b>{selectedNode.severity}</b> because it
+                        propagates untrusted data into security-sensitive
+                        sinks without proper sanitization.
+                      </>
+                    ) : (
+                      <>This node is not currently flagged as vulnerable.</>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="gv-inspector-section">
+                <div className="gv-inspector-value">No node selected</div>
               </div>
-              <div className="gv-ai-insight">
-                {selectedNode.severity ? (
-                  <>
-                    The variable{" "}
-                    <span className="gv-highlight">
-                      {selectedNode.label}
-                    </span>{" "}
-                    is marked <b>{selectedNode.severity}</b> because it
-                    propagates untrusted data into security-sensitive
-                    sinks without proper sanitization.
-                  </>
-                ) : (
-                  <>This node is not currently flagged as vulnerable.</>
-                )}
-              </div>
-            </div>
+            )}
 
             <div className="gv-inspector-footer">
               <span className="gv-inspector-hint">

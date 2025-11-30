@@ -1,35 +1,158 @@
 // src/pages/PatchGeneratorPage.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
+import { patchService, scanService } from "../api/services";
 
 export default function PatchGeneratorPage() {
-  const [vuln, setVuln] = useState("VUL-014");
-  const [patch, setPatch] = useState("patch1");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const scanId = searchParams.get("scanId");
+  
+  const [vulnerabilities, setVulnerabilities] = useState([]);
+  const [selectedVuln, setSelectedVuln] = useState("");
+  const [patches, setPatches] = useState([]);
+  const [selectedPatch, setSelectedPatch] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Redirect to scan page if no scanId provided
+  useEffect(() => {
+    if (!scanId) {
+      // Try to get last scan from sessionStorage
+      const lastScanId = sessionStorage.getItem('lastScanId');
+      if (lastScanId) {
+        navigate(`/patches?scanId=${lastScanId}`);
+      } else {
+        navigate("/scan");
+      }
+      return;
+    }
+    fetchVulnerabilities();
+  }, [scanId, navigate]);
+
+  const fetchVulnerabilities = async () => {
+    if (!scanId) return;
+    try {
+      const res = await patchService.getVulnerabilities(scanId);
+      const vulns = res.data || [];
+      setVulnerabilities(vulns);
+      if (vulns.length > 0) setSelectedVuln(vulns[0].id);
+    } catch (err) {
+      console.error("Failed to fetch vulnerabilities from API:", err);
+      
+      // Fallback to sessionStorage
+      const cached = sessionStorage.getItem(`scan_${scanId}`);
+      if (cached) {
+        const scanData = JSON.parse(cached);
+        const vulns = scanData.vulnerabilities || [];
+        setVulnerabilities(vulns);
+        if (vulns.length > 0) setSelectedVuln(vulns[0].id);
+      }
+    }
+  };
+
+  const handleGeneratePatch = async () => {
+    if (!selectedVuln) return;
+    setLoading(true);
+    try {
+      const res = await patchService.generate({
+        vulnerability_id: selectedVuln,
+      });
+      const newPatch = res.data;
+      setPatches((prev) => [...prev, newPatch]);
+      setSelectedPatch(newPatch);
+    } catch (err) {
+      console.error("Failed to generate patch:", err);
+      alert("Failed to generate patch.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyPatch = async () => {
+    if (!selectedPatch) return;
+    try {
+      await patchService.apply(selectedPatch.id);
+      alert("Patch applied successfully!");
+    } catch (err) {
+      console.error("Failed to apply patch:", err);
+      alert("Failed to apply patch.");
+    }
+  };
+
+  const handleExportPatch = async () => {
+    if (!selectedPatch) return;
+    try {
+      const res = await patchService.export(selectedPatch.id);
+      const blob = new Blob([res.data.content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.data.filename || "patch.diff";
+      a.click();
+    } catch (err) {
+      console.error("Failed to export patch:", err);
+      alert("Failed to export patch.");
+    }
+  };
+
+  const handleRegeneratePatch = async () => {
+    if (!selectedPatch) return;
+    try {
+      const res = await patchService.regenerate(selectedPatch.id);
+      setSelectedPatch(res.data);
+      alert("Patch regenerated!");
+    } catch (err) {
+      console.error("Failed to regenerate patch:", err);
+      alert("Failed to regenerate patch.");
+    }
+  };
 
   return (
     <div className="pg-wrapper">
 
       {/* Page Heading */}
       <div className="pg-heading-row">
-        <h1 className="pg-title">AI-Based Patch Generation</h1>
-        <button className="pg-generate-btn">Generate Patch</button>
+        <div>
+          <h1 className="pg-title">AI-Based Patch Generation</h1>
+          <span style={{ 
+            fontSize: '0.9rem', 
+            color: '#666', 
+            background: '#f0f0f0', 
+            padding: '4px 12px', 
+            borderRadius: '4px',
+            fontFamily: 'monospace',
+            display: 'inline-block',
+            marginTop: '0.5rem'
+          }}>
+            Scan ID: {scanId}
+          </span>
+        </div>
+        <button
+          className="pg-generate-btn"
+          onClick={handleGeneratePatch}
+          disabled={loading || !selectedVuln}
+        >
+          {loading ? "Generating..." : "Generate Patch"}
+        </button>
       </div>
 
       {/* Main Card */}
       <div className="pg-card">
-
         {/* Dropdown Row */}
         <div className="pg-dropdown-row">
           <div className="pg-dropdown-group">
             <label>Select vulnerability</label>
             <select
               className="pg-select"
-              value={vuln}
-              onChange={(e) => setVuln(e.target.value)}
+              value={selectedVuln}
+              onChange={(e) => setSelectedVuln(e.target.value)}
             >
-              <option value="VUL-014">VUL-014</option>
-              <option value="VUL-021">VUL-021</option>
-              <option value="VUL-033">VUL-033</option>
+              {vulnerabilities.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name || v.id}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -37,50 +160,42 @@ export default function PatchGeneratorPage() {
             <label>AI-generated patch</label>
             <select
               className="pg-select"
-              value={patch}
-              onChange={(e) => setPatch(e.target.value)}
+              value={selectedPatch?.id || ""}
+              onChange={(e) => {
+                const p = patches.find((x) => x.id === e.target.value);
+                setSelectedPatch(p);
+              }}
             >
-              <option value="patch1">void log.info(const)::cpp</option>
-              <option value="patch2">authenticate_user::cpp</option>
-              <option value="patch3">connection_handler.cpp</option>
+              {patches.length > 0 ? (
+                patches.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    Patch {p.id}
+                  </option>
+                ))
+              ) : (
+                <option value="">No patches generated</option>
+              )}
             </select>
           </div>
         </div>
 
         {/* Code Compare Row */}
         <div className="pg-code-compare">
-
           {/* Original Code */}
           <div className="pg-code-box">
             <pre className="pg-code">
-{`1   void log_info(const std::string& msg);
-2   void handle_connection(int sock);
-
-3   bool authenticate_user(const std::string& a){
-4   {
-5       return buffer, password);
-6   }`}
+              {selectedPatch?.original_code || "No patch selected"}
             </pre>
-
             <div className="pg-diff-red"></div>
           </div>
 
           {/* Patched Code */}
           <div className="pg-code-box">
             <pre className="pg-code pg-green">
-{`1   void log_info(const std::string& msg);
-2   void handle_connection(int sock);
-
-3   bool authenticate_user(const std::string& a){
-4
-5       strncpy(buffer, password, sizeof(buffer)-1);
-6       buffer[sizeof(buffer)-1] = '\\0';
-7   }`}
+              {selectedPatch?.patched_code || "No patch selected"}
             </pre>
-
             <div className="pg-diff-green"></div>
           </div>
-
         </div>
 
         {/* Explanation + Confidence Row */}
@@ -90,21 +205,37 @@ export default function PatchGeneratorPage() {
           <div className="pg-explain-card">
             <div className="pg-explain-header">
               <span>AI-generated explanation</span>
-              <span className="pg-tag">CWE-121</span>
+              <span className="pg-tag">CWE</span>
               <span className="pg-ai-tag">AI</span>
             </div>
 
             <p className="pg-explain-text">
-              The patch alters <b>strcpy()</b> to <b>strncpy()</b>,
-              ensuring the buffer is not overflowed by specifying
-              the maximum number of bytes to copy. This prevents
-              a stack-based buffer overflow vulnerability.
+              {selectedPatch?.explanation ||
+                "Select a patch to see AI explanation."}
             </p>
 
             <div className="pg-btn-row">
-              <button className="pg-secondary-btn">Re-generate</button>
-              <button className="pg-secondary-btn">Export Patch</button>
-              <button className="pg-secondary-btn">Apply Patch</button>
+              <button
+                className="pg-secondary-btn"
+                onClick={handleRegeneratePatch}
+                disabled={!selectedPatch}
+              >
+                Re-generate
+              </button>
+              <button
+                className="pg-secondary-btn"
+                onClick={handleExportPatch}
+                disabled={!selectedPatch}
+              >
+                Export Patch
+              </button>
+              <button
+                className="pg-secondary-btn"
+                onClick={handleApplyPatch}
+                disabled={!selectedPatch}
+              >
+                Apply Patch
+              </button>
             </div>
           </div>
 
@@ -122,13 +253,18 @@ export default function PatchGeneratorPage() {
                 />
                 <path
                   className="pg-ring-fg"
-                  strokeDasharray="82, 100"
+                  strokeDasharray={`${selectedPatch?.confidence || 0}, 100`}
                   d="M18 2.0845
                     a 15.9155 15.9155 0 0 1 0 31.831
                     a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
               </svg>
-              <div className="pg-ring-text">82%</div>
+              <div className="pg-ring-text">
+                {selectedPatch?.confidence
+                  ? Math.round(selectedPatch.confidence * 100)
+                  : 0}
+                %
+              </div>
             </div>
           </div>
 

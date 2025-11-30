@@ -27,10 +27,17 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     if (err?.response?.status === 401) {
-      setAccessToken(null);
-      // Optionally dispatch a global event for redirect handling
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new CustomEvent("vulcan:unauthorized"));
+      // Only clear token and logout if it's an auth endpoint or token is actually invalid
+      const isAuthEndpoint = err.config?.url?.includes('/auth/');
+      const hasToken = getAccessToken();
+      
+      // If we have a token and it's not an auth endpoint, don't auto-logout
+      // The endpoint might just not be implemented yet
+      if (isAuthEndpoint || !hasToken) {
+        setAccessToken(null);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("vulcan:unauthorized"));
+        }
       }
     }
     return Promise.reject(err);

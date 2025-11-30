@@ -1,42 +1,47 @@
 // src/pages/RepoIntegrationPage.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "../App.css";
-
-const INITIAL_REPOS = [
-  {
-    name: "Repo 1",
-    branch: "main",
-    lastScan: "2024-04-03",
-    vulns: 5,
-  },
-  {
-    name: "Repo 2",
-    branch: "dev",
-    lastScan: "2024-03-28",
-    vulns: 12,
-  },
-  {
-    name: "Repo 3",
-    branch: "feature",
-    lastScan: "2024-03-20",
-    vulns: "Scan Now",
-  },
-];
+import { repositoryService } from "../api/services";
 
 const BRANCHES = ["main", "dev", "feature"];
 
 function RepoIntegrationPage() {
-  const [repositories, setRepositories] = useState(INITIAL_REPOS);
+  const [repositories, setRepositories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleDelete = (name) => {
-    setRepositories((prev) => prev.filter((r) => r.name !== name));
+  useEffect(() => {
+    fetchRepositories();
+  }, []);
+
+  const fetchRepositories = async () => {
+    try {
+      const res = await repositoryService.list();
+      setRepositories(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch repositories:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleScanNow = (name) => {
-    console.log("Scan now for:", name);
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this repository?"))
+      return;
+    try {
+      await repositoryService.delete(id);
+      setRepositories((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error("Failed to delete repository:", err);
+      alert("Failed to delete repository.");
+    }
   };
 
-  const handleUpload = (event) => {
+  const handleScanNow = (id) => {
+    console.log("Scan now for repository ID:", id);
+    // Navigate to /scan with repo_id or trigger scan
+  };
+
+  const handleUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -45,8 +50,26 @@ function RepoIntegrationPage() {
       return;
     }
 
-    console.log("Uploaded local source:", file.name);
+    try {
+      // For upload, we need a repo ID. For now, create a placeholder LOCAL repo first
+      const createRes = await repositoryService.create({
+        name: file.name,
+        provider: "LOCAL",
+        status: "CONNECTED",
+      });
+      const repoId = createRes.data.id;
+      await repositoryService.upload(repoId, file);
+      alert("Uploaded successfully!");
+      fetchRepositories();
+    } catch (err) {
+      console.error("Upload failed:", err);
+      alert("Upload failed: " + (err.response?.data?.detail || err.message));
+    }
   };
+
+  if (loading) {
+    return <div className="ri-page">Loading...</div>;
+  }
 
   return (
     <div className="ri-page">
@@ -55,7 +78,12 @@ function RepoIntegrationPage() {
       <div className="ri-shell">
         {/* Add new */}
         <div className="ri-header-actions">
-          <button className="ri-add-btn">Add New Repository</button>
+          <button
+            className="ri-add-btn"
+            onClick={() => alert("Add repository dialog (to be implemented)")}
+          >
+            Add New Repository
+          </button>
         </div>
 
         {/* PROVIDER LIST – pixel perfect */}
@@ -116,12 +144,12 @@ function RepoIntegrationPage() {
             </thead>
             <tbody>
               {repositories.map((repo) => (
-                <tr key={repo.name}>
+                <tr key={repo.id}>
                   <td>{repo.name}</td>
                   <td>
                     <select
                       className="ri-branch-select"
-                      defaultValue={repo.branch}
+                      defaultValue={repo.default_branch || "main"}
                     >
                       {BRANCHES.map((b) => (
                         <option key={b} value={b}>
@@ -130,23 +158,27 @@ function RepoIntegrationPage() {
                       ))}
                     </select>
                   </td>
-                  <td>{repo.lastScan}</td>
                   <td>
-                    {repo.vulns === "Scan Now" ? (
+                    {repo.last_scan
+                      ? new Date(repo.last_scan).toLocaleDateString()
+                      : "N/A"}
+                  </td>
+                  <td>
+                    {repo.vulnerabilities_count !== undefined ? (
+                      repo.vulnerabilities_count
+                    ) : (
                       <button
                         className="ri-scan-link"
-                        onClick={() => handleScanNow(repo.name)}
+                        onClick={() => handleScanNow(repo.id)}
                       >
                         Scan Now
                       </button>
-                    ) : (
-                      repo.vulns
                     )}
                   </td>
                   <td className="ri-actions-cell">
                     <button
                       className="ri-delete-link"
-                      onClick={() => handleDelete(repo.name)}
+                      onClick={() => handleDelete(repo.id)}
                     >
                       Delete
                     </button>
