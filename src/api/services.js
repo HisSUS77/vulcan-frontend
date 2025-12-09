@@ -45,6 +45,16 @@ export const scanService = {
   getLogs: (scanId) => api.get(`/scans/${scanId}/logs`),
   getSummary: (scanId) => api.get(`/scans/${scanId}/summary`),
   cancel: (scanId) => api.post(`/scans/${scanId}/cancel`),
+  // Export scan results
+  exportPDF: (scanId) =>
+    api.get(`/reports/${scanId}/export`, {
+      params: { format: "pdf" },
+      responseType: "blob", // CRITICAL for binary data
+    }),
+  exportJSON: (scanId) =>
+    api.get(`/reports/${scanId}/export`, {
+      params: { format: "json" },
+    }),
 };
 
 // ============= GRAPHS =============

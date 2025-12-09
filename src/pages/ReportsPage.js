@@ -1,6 +1,6 @@
 // src/pages/ReportsPage.js
 import React, { useState, useEffect } from "react";
-import { reportService, patchService, scanService } from "../api/services";
+import { scanService } from "../api/services";
 import "../App.css";
 
 export default function ReportsPage() {
@@ -162,11 +162,16 @@ export default function ReportsPage() {
   const handleExportPDF = async () => {
     if (!selectedScan) return;
     try {
-      const blob = await reportService.export(selectedScan, "pdf");
-      downloadBlob(blob, `scan-report-${selectedScan}.pdf`);
+      const response = await scanService.exportPDF(selectedScan);
+      const blob = response.data || response; // Handle axios response
+      downloadBlob(blob, `vulcan-scan-${selectedScan}-report.pdf`);
     } catch (err) {
       console.error("Failed to export PDF:", err);
-      alert("PDF export not yet implemented in backend. Use JSON or CSV export.");
+      if (err.response?.status === 404) {
+        alert("Scan not found or not completed yet.");
+      } else {
+        alert("Failed to generate PDF report. Please try again.");
+      }
     }
   };
 
@@ -289,7 +294,7 @@ export default function ReportsPage() {
                         backgroundColor: selectedVuln?.id === row.id ? '#f0f7ff' : 'transparent'
                       }}
                     >
-                      <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <td title={row.type}>
                         {row.type}
                       </td>
                       <td>
@@ -304,7 +309,7 @@ export default function ReportsPage() {
                       </td>
                       <td className="rv-mono">{row.cwe}</td>
                       <td className="rv-mono">{row.owasp}</td>
-                      <td className="rv-mono" style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <td className="rv-mono" title={row.file}>
                         {row.file}
                       </td>
                       <td className="rv-mono">{row.line}</td>
@@ -368,7 +373,9 @@ export default function ReportsPage() {
           background: 'white', 
           borderRadius: '8px', 
           padding: '2rem',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          maxWidth: '100%',
+          overflow: 'hidden'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
             <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#333' }}>Vulnerability Details</h2>
@@ -390,12 +397,12 @@ export default function ReportsPage() {
           </div>
           
           {/* Horizontal Two-Column Layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', overflow: 'hidden' }}>
             {/* Left Column */}
-            <div>
+            <div style={{ minWidth: 0 }}>
               {/* Header Section */}
               <div style={{ background: '#f5f5f5', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.3rem', color: '#333' }}>{selectedVuln.type}</h3>
+                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.3rem', color: '#333', wordWrap: 'break-word' }}>{selectedVuln.type}</h3>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <span className={`rv-tag rv-tag-sev ${selectedVuln.severity.toLowerCase()}`} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
                     {selectedVuln.severity}
@@ -438,15 +445,15 @@ export default function ReportsPage() {
               </div>
 
               {/* Metadata */}
-              <div style={{ marginBottom: '1.5rem', background: '#fafafa', padding: '1rem', borderRadius: '6px' }}>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b>ID:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000' }}>{selectedVuln.id}</code>
+              <div style={{ marginBottom: '1.5rem', background: '#fafafa', padding: '1rem', borderRadius: '6px', overflow: 'hidden' }}>
+                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
+                  <b>ID:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.id}</code>
                 </p>
                 <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
                   <b>CWE:</b> {selectedVuln.cwe} &nbsp;|&nbsp; <b>OWASP:</b> {selectedVuln.owasp}
                 </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b>File:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000' }}>{selectedVuln.file}</code>
+                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
+                  <b>File:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.file}</code>
                 </p>
                 <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
                   <b>Lines:</b> {selectedVuln.line}
@@ -454,28 +461,28 @@ export default function ReportsPage() {
               </div>
 
               {/* Data Flow */}
-              <div style={{ background: '#fff3cd', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #ffc107' }}>
+              <div style={{ background: '#fff3cd', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #ffc107', overflow: 'hidden' }}>
                 <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#856404', fontSize: '1.1rem' }}>
                   🔍 Data Flow Analysis
                 </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b style={{ color: '#000' }}>Source:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000' }}>{selectedVuln.source}</code>
+                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
+                  <b style={{ color: '#000' }}>Source:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.source}</code>
                 </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b style={{ color: '#000' }}>Sink:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000' }}>{selectedVuln.sink}</code>
+                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
+                  <b style={{ color: '#000' }}>Sink:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.sink}</code>
                 </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
+                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
                   <b style={{ color: '#000' }}>Pattern:</b> {selectedVuln.pattern}
                 </p>
               </div>
 
               {/* Static Analysis */}
               {selectedVuln.staticReason && (
-                <div style={{ background: '#e3f2fd', padding: '1.2rem', borderRadius: '8px', border: '2px solid #2196f3' }}>
+                <div style={{ background: '#e3f2fd', padding: '1.2rem', borderRadius: '8px', border: '2px solid #2196f3', overflow: 'hidden' }}>
                   <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#0d47a1', fontSize: '1.1rem' }}>
                     ⚡ Static Detection
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#1565c0', lineHeight: '1.7' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#1565c0', lineHeight: '1.7', wordWrap: 'break-word' }}>
                     {selectedVuln.staticReason}
                   </p>
                 </div>
@@ -483,10 +490,10 @@ export default function ReportsPage() {
             </div>
 
             {/* Right Column */}
-            <div>
+            <div style={{ minWidth: 0, overflow: 'hidden' }}>
               {/* Code Snippet */}
               {selectedVuln.codeSnippet && (
-                <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
                   <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', fontSize: '1.1rem' }}>📄 Vulnerable Code:</p>
                   <pre style={{ 
                     background: '#1e1e1e', 
@@ -497,18 +504,21 @@ export default function ReportsPage() {
                     color: '#d4d4d4',
                     lineHeight: '1.6',
                     border: '3px solid #ff4444',
-                    maxHeight: '300px'
+                    maxHeight: '300px',
+                    maxWidth: '100%',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word'
                   }}>{selectedVuln.codeSnippet}</pre>
                 </div>
               )}
 
               {/* LLM Explanation */}
               {selectedVuln.llmExplanation && (
-                <div style={{ background: '#f3e5f5', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #9c27b0' }}>
+                <div style={{ background: '#f3e5f5', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #9c27b0', overflow: 'hidden' }}>
                   <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#6a1b9a', fontSize: '1.1rem' }}>
                     🤖 AI Analysis
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#7b1fa2', lineHeight: '1.8' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#7b1fa2', lineHeight: '1.8', wordWrap: 'break-word' }}>
                     {selectedVuln.llmExplanation}
                   </p>
                 </div>
@@ -516,11 +526,11 @@ export default function ReportsPage() {
 
               {/* Remediation */}
               {selectedVuln.llmRemediation && (
-                <div style={{ background: '#e8f5e9', padding: '1.2rem', borderRadius: '8px', border: '2px solid #4caf50' }}>
+                <div style={{ background: '#e8f5e9', padding: '1.2rem', borderRadius: '8px', border: '2px solid #4caf50', overflow: 'hidden' }}>
                   <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#2e7d32', fontSize: '1.1rem' }}>
                     ✅ Recommended Fix
                   </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#388e3c', lineHeight: '1.8' }}>
+                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#388e3c', lineHeight: '1.8', wordWrap: 'break-word' }}>
                     {selectedVuln.llmRemediation}
                   </p>
                 </div>
