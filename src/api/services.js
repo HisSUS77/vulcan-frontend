@@ -4,9 +4,14 @@ import { api } from "./client";
 // ============= AUTH =============
 export const authService = {
   login: (email, password) => api.post("/auth/login", { email, password }),
+  register: (payload) => api.post("/auth/register", payload),
   logout: () => api.post("/auth/logout"),
   me: () => api.get("/auth/me"),
   refresh: () => api.post("/auth/refresh"),
+  forgotPassword: (email) => api.post("/auth/forgot-password", { email }),
+  resetPassword: (token, newPassword) =>
+    api.post("/auth/reset-password", { token, new_password: newPassword }),
+  validateResetToken: (token) => api.post("/auth/validate-reset-token", { token }),
 };
 
 // ============= DASHBOARD =============

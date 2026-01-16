@@ -141,6 +141,15 @@ body {
   background: transparent;
   cursor: pointer;
   font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lp-password-icon {
+  width: 18px;
+  height: 18px;
+  color: #6b7280;
 }
 
 /* Buttons */
@@ -173,6 +182,42 @@ body {
   color: #2563eb;
   font-size: 14px;
   cursor: pointer;
+}
+
+.lp-links-row {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.lp-links-row .lp-link-btn {
+  margin-top: 0;
+}
+
+.lp-helper-text {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.lp-alert {
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.lp-alert-success {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.lp-alert-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
 }
 
 /* Divider + OAuth */
@@ -221,21 +266,25 @@ body {
 .lp-oauth-icon {
   width: 20px;
   height: 20px;
-  border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+}
+
+.lp-oauth-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .lp-google-btn .lp-oauth-icon {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: transparent;
+  border: none;
 }
 
 .lp-github-btn .lp-oauth-icon {
-  background: #111827;
-  color: #ffffff;
+  background: transparent;
+  color: #111827;
 }
 
 @media (max-width: 480px) {
@@ -476,6 +525,33 @@ body {
   color: #9ca3af;
 }
 
+.v-profile-role {
+  margin: 8px 0 0;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.v-role-admin {
+  background: rgba(255, 120, 80, 0.25);
+  color: #ff8c66;
+}
+
+.v-role-premium {
+  background: rgba(91, 198, 124, 0.2);
+  color: #5bc67c;
+}
+
+.v-role-normal {
+  background: rgba(150, 170, 210, 0.2);
+  color: #9ab0e3;
+}
+
 .v-profile-menu button {
   width: 100%;
   background: transparent;
@@ -501,6 +577,111 @@ body {
   flex: 1;
   padding: 20px 22px 24px;
   overflow-y: auto;
+}
+
+.acct-page {
+  display: flex;
+  justify-content: center;
+  padding: 12px;
+}
+
+.acct-card {
+  width: min(720px, 100%);
+  background: rgba(23, 26, 39, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+}
+
+.acct-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.acct-title {
+  margin: 0;
+  font-size: 22px;
+  color: #fff;
+}
+
+.acct-subtitle {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+}
+
+.acct-refresh-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.acct-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.acct-grid {
+  display: grid;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.acct-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.acct-label {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.acct-value {
+  font-weight: 600;
+}
+
+.acct-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.acct-role-admin {
+  background: rgba(255, 120, 80, 0.25);
+  color: #ff8c66;
+}
+
+.acct-role-premium {
+  background: rgba(91, 198, 124, 0.2);
+  color: #5bc67c;
+}
+
+.acct-role-normal {
+  background: rgba(150, 170, 210, 0.2);
+  color: #9ab0e3;
+}
+
+.acct-muted {
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 12px;
+}
+
+.acct-error {
+  color: #ff8c66;
+  margin-top: 12px;
 }
 
 /* Dashboard layout */
@@ -962,6 +1143,120 @@ body {
   text-decoration: underline;
 }
 
+/* Modal Styles */
+.ri-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.ri-modal {
+  background: #0f172a;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid #1e293b;
+}
+
+.ri-modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 20px;
+}
+
+.ri-form-group {
+  margin-bottom: 16px;
+}
+
+.ri-form-group label {
+  display: block;
+  color: #9ca3af;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.ri-form-group input,
+.ri-form-group select {
+  width: 100%;
+  padding: 10px 14px;
+  background: #020617;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #e5e7eb;
+  font-size: 14px;
+}
+
+.ri-form-group input:focus,
+.ri-form-group select:focus {
+  outline: none;
+  border-color: #38bdf8;
+}
+
+.ri-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.ri-modal-cancel {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #9ca3af;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.ri-modal-cancel:hover {
+  background: #1e293b;
+}
+
+/* Provider Badge */
+.ri-provider-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.ri-provider-github {
+  background: rgba(36, 41, 46, 0.5);
+  color: #e5e7eb;
+}
+
+.ri-provider-gitlab {
+  background: rgba(226, 67, 41, 0.2);
+  color: #fc6d26;
+}
+
+.ri-provider-bitbucket {
+  background: rgba(0, 82, 204, 0.2);
+  color: #0052cc;
+}
+
+.ri-provider-local {
+  background: rgba(34, 197, 94, 0.2);
+  color: #22c55e;
+}
+
+.ri-vuln-count {
+  color: #f97373;
+  font-weight: 600;
+}
+
 /* Responsive */
 
 @media (max-width: 960px) {
@@ -1098,7 +1393,7 @@ body {
   width: 100%;
   background: #020617;
   color: #e5e7eb;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid #334155;
   padding: 6px 12px;
   font-size: 14px;

@@ -2,6 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
+import { authService } from "../../api/services";
+import { getCurrentUser, setCurrentUser, setAccessToken } from "../../api/client";
 
 // ==== MODERN ICONS (Lucide) ====
 import {
@@ -32,6 +34,7 @@ function AppLayout({ children }) {
   const [search, setSearch] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [user, setUser] = useState(getCurrentUser());
   const profileRef = useRef(null);
 
   const suggestions =
@@ -51,8 +54,31 @@ function AppLayout({ children }) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadProfile = async () => {
+      try {
+        const res = await authService.me();
+        if (!mounted) return;
+        setUser(res.data);
+        setCurrentUser(res.data);
+      } catch {
+        if (!mounted) return;
+        setUser(null);
+        setCurrentUser(null);
+      }
+    };
+    if (!user) {
+      loadProfile();
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
   const handleLogout = () => {
-    localStorage.removeItem("access_token");
+    setAccessToken(null);
+    setCurrentUser(null);
     navigate("/login", { replace: true });
   };
 
@@ -140,11 +166,16 @@ function AppLayout({ children }) {
               {profileOpen && (
                 <div className="v-profile-menu">
                   <div className="v-profile-menu-header">
-                    <p className="v-profile-name">Agent Vulcan</p>
-                    <p className="v-profile-email">agent@vulcan.ai</p>
+                    <p className="v-profile-name">{user?.full_name || "Vulcan User"}</p>
+                    <p className="v-profile-email">{user?.email || "user@vulcan.ai"}</p>
+                    <p className={`v-profile-role v-role-${user?.role || "normal"}`}>
+                      {(user?.role || "normal").toUpperCase()}
+                    </p>
                   </div>
 
-                  <button type="button">Account settings</button>
+                  <button type="button" onClick={() => navigate("/account")}>
+                    Account settings
+                  </button>
                   <button type="button">API keys</button>
                   <button
                     type="button"

@@ -1,19 +1,43 @@
 // src/pages/PatchGeneratorPage.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { patchService, scanService } from "../api/services";
+import { patchService } from "../api/services";
 
 export default function PatchGeneratorPage() {
+  //  Extract Query Params
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const scanId = searchParams.get("scanId");
-  
+  //  Component State
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [selectedVuln, setSelectedVuln] = useState("");
   const [patches, setPatches] = useState([]);
   const [selectedPatch, setSelectedPatch] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // 📥 FUNCTION: Fetch Vulnerabilities for Scan
+  const fetchVulnerabilities = useCallback(async () => {
+    if (!scanId) return;
+    try {
+      // Call backend to get vulnerability list
+      const res = await patchService.getVulnerabilities(scanId);
+      const vulns = res.data || [];
+      setVulnerabilities(vulns);
+      if (vulns.length > 0) setSelectedVuln(vulns[0].id);
+    } catch (err) {
+      console.error("Failed to fetch vulnerabilities from API:", err);
+
+      // Fallback to sessionStorage
+      const cached = sessionStorage.getItem(`scan_${scanId}`);
+      if (cached) {
+        const scanData = JSON.parse(cached);
+        const vulns = scanData.vulnerabilities || [];
+        setVulnerabilities(vulns);
+        if (vulns.length > 0) setSelectedVuln(vulns[0].id);
+      }
+    }
+  }, [scanId]);
 
   // Redirect to scan page if no scanId provided
   useEffect(() => {
@@ -28,29 +52,9 @@ export default function PatchGeneratorPage() {
       return;
     }
     fetchVulnerabilities();
-  }, [scanId, navigate]);
+  }, [scanId, navigate, fetchVulnerabilities]);
 
-  const fetchVulnerabilities = async () => {
-    if (!scanId) return;
-    try {
-      const res = await patchService.getVulnerabilities(scanId);
-      const vulns = res.data || [];
-      setVulnerabilities(vulns);
-      if (vulns.length > 0) setSelectedVuln(vulns[0].id);
-    } catch (err) {
-      console.error("Failed to fetch vulnerabilities from API:", err);
-      
-      // Fallback to sessionStorage
-      const cached = sessionStorage.getItem(`scan_${scanId}`);
-      if (cached) {
-        const scanData = JSON.parse(cached);
-        const vulns = scanData.vulnerabilities || [];
-        setVulnerabilities(vulns);
-        if (vulns.length > 0) setSelectedVuln(vulns[0].id);
-      }
-    }
-  };
-
+  // ⚙️ FUNCTION: Generate New Patch
   const handleGeneratePatch = async () => {
     if (!selectedVuln) return;
     setLoading(true);
@@ -60,7 +64,7 @@ export default function PatchGeneratorPage() {
       });
       const newPatch = res.data;
       setPatches((prev) => [...prev, newPatch]);
-      setSelectedPatch(newPatch);
+      setSelectedPatch(newPatch); // Auto-select newly generated patch
     } catch (err) {
       console.error("Failed to generate patch:", err);
       alert("Failed to generate patch.");
@@ -68,7 +72,7 @@ export default function PatchGeneratorPage() {
       setLoading(false);
     }
   };
-
+  // 🛠 FUNCTION: Apply Patch to Source Code
   const handleApplyPatch = async () => {
     if (!selectedPatch) return;
     try {
@@ -79,11 +83,13 @@ export default function PatchGeneratorPage() {
       alert("Failed to apply patch.");
     }
   };
+  // 📤 FUNCTION: Export Patch as .diff File
 
   const handleExportPatch = async () => {
     if (!selectedPatch) return;
     try {
       const res = await patchService.export(selectedPatch.id);
+      // Create and download a text file containing patch content
       const blob = new Blob([res.data.content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -95,7 +101,7 @@ export default function PatchGeneratorPage() {
       alert("Failed to export patch.");
     }
   };
-
+  // 🔄 FUNCTION: Re-generate Patch with AI Again
   const handleRegeneratePatch = async () => {
     if (!selectedPatch) return;
     try {
@@ -115,11 +121,11 @@ export default function PatchGeneratorPage() {
       <div className="pg-heading-row">
         <div>
           <h1 className="pg-title">AI-Based Patch Generation</h1>
-          <span style={{ 
-            fontSize: '0.9rem', 
-            color: '#666', 
-            background: '#f0f0f0', 
-            padding: '4px 12px', 
+          <span style={{
+            fontSize: '0.9rem',
+            color: '#666',
+            background: '#f0f0f0',
+            padding: '4px 12px',
             borderRadius: '4px',
             fontFamily: 'monospace',
             display: 'inline-block',

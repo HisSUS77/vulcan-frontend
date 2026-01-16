@@ -1,7 +1,9 @@
 // src/pages/LoginPage.js
 import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { api, setAccessToken } from "../api/client";
+import { api, setAccessToken, setCurrentUser } from "../api/client";
+import { authService } from "../api/services";
 import "../App.css";
 
 function LoginPage() {
@@ -29,13 +31,19 @@ function LoginPage() {
       });
       if (data?.access_token) {
         setAccessToken(data.access_token);
+        try {
+          const me = await authService.me();
+          setCurrentUser(me.data);
+        } catch {
+          setCurrentUser(null);
+        }
         const dest = location.state?.from?.pathname || "/dashboard";
         navigate(dest, { replace: true });
         return;
       }
       throw new Error("No token in response");
     } catch (err) {
-      const msg = err?.response?.data?.detail || "Login failed. Please check your credentials.";
+      const msg = err?.userMessage || err?.response?.data?.detail || "Login failed. Please check your credentials.";
       alert(msg);
     }
   };
@@ -88,7 +96,11 @@ function LoginPage() {
                 className="lp-password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
               >
-                {showPassword ? "🙈" : "👁️"}
+                {showPassword ? (
+                  <EyeOff className="lp-password-icon" aria-hidden="true" />
+                ) : (
+                  <Eye className="lp-password-icon" aria-hidden="true" />
+                )}
               </button>
             </div>
           </div>
@@ -97,13 +109,24 @@ function LoginPage() {
           <button type="submit" className="lp-primary-btn">
             Login
           </button>
+          <div className="lp-links-row">
+            <button
+              type="button"
+              className="lp-link-btn"
+              onClick={() => navigate("/register")}
+            >
+              Create an account
+            </button>
+            <button
+              type="button"
+              className="lp-link-btn"
+              onClick={() => navigate("/forgot-password")}
+            >
+              Forgot password?
+            </button>
+          </div>
           {/* No default credential bypass in production */}
         </form>
-
-        {/* Forgot password */}
-        <button type="button" className="lp-link-btn">
-          Forgot password?
-        </button>
 
         {/* Divider */}
         <div className="lp-divider">
@@ -114,13 +137,39 @@ function LoginPage() {
 
         {/* Social buttons */}
         <button type="button" className="lp-oauth-btn lp-google-btn">
-          <span className="lp-oauth-icon">G</span>
+          <span className="lp-oauth-icon" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img" aria-label="Google logo">
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.2 1.54 7.63 2.83l5.54-5.54C33.64 3.6 29.2 1.5 24 1.5 14.85 1.5 7.05 6.76 3.2 14.4l6.7 5.2C11.5 13.16 17.27 9.5 24 9.5z"
+              />
+              <path
+                fill="#34A853"
+                d="M46.1 24.6c0-1.55-.14-3.04-.4-4.5H24v8.54h12.4c-.54 2.9-2.16 5.35-4.6 7.03l7.08 5.5c4.13-3.8 6.52-9.4 6.52-15.63z"
+              />
+              <path
+                fill="#4285F4"
+                d="M9.9 28.9a14.46 14.46 0 0 1-.77-4.9c0-1.7.28-3.35.77-4.9l-6.7-5.2A22.99 22.99 0 0 0 1 24c0 3.7.88 7.18 2.2 10.1l6.7-5.2z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M24 46.5c6.2 0 11.4-2.06 15.2-5.56l-7.08-5.5c-1.96 1.32-4.5 2.1-8.12 2.1-6.73 0-12.5-3.66-14.1-8.9l-6.7 5.2C7.05 41.24 14.85 46.5 24 46.5z"
+              />
+            </svg>
+          </span>
           <span>Sign in with Google</span>
         </button>
 
         <button type="button" className="lp-oauth-btn lp-github-btn">
-          <span className="lp-oauth-icon">🐱</span>
-          <span>Sign in with Github</span>
+          <span className="lp-oauth-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img" aria-label="GitHub logo">
+              <path
+                fill="currentColor"
+                d="M12 1.5c-5.8 0-10.5 4.7-10.5 10.5 0 4.64 3.04 8.57 7.26 9.96.53.1.73-.23.73-.52v-1.84c-2.95.64-3.57-1.24-3.57-1.24-.48-1.22-1.18-1.55-1.18-1.55-.97-.66.08-.65.08-.65 1.07.08 1.64 1.1 1.64 1.1.95 1.64 2.5 1.16 3.1.88.1-.7.37-1.16.67-1.42-2.36-.27-4.84-1.18-4.84-5.24 0-1.16.42-2.1 1.1-2.84-.1-.27-.48-1.36.1-2.84 0 0 .9-.3 2.96 1.08a10.2 10.2 0 0 1 5.4 0c2.06-1.38 2.96-1.08 2.96-1.08.58 1.48.2 2.57.1 2.84.68.74 1.1 1.68 1.1 2.84 0 4.08-2.48 4.96-4.86 5.22.38.33.72.98.72 1.98v2.94c0 .3.2.62.74.52A10.51 10.51 0 0 0 22.5 12c0-5.8-4.7-10.5-10.5-10.5z"
+              />
+            </svg>
+          </span>
+          <span>Sign in with GitHub</span>
         </button>
       </div>
     </div>

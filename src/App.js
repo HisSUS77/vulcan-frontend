@@ -4,6 +4,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import "./App.css";
 
 import LoginPage from "./pages/loginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AccountPage from "./pages/AccountPage";
 import DashboardPage from "./pages/DashboardPage";
 import ScanPage from "./pages/ScanPage";
 import RepoIntegrationPage from "./pages/RepoIntegrationPage";
@@ -19,6 +23,9 @@ function App() {
       <Routes>
         {/* Public route */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Layout-wrapped routes (later we can add auth guard) */}
         <Route
@@ -77,6 +84,16 @@ function App() {
             <RequireAuth>
               <AppLayout>
                 <ReportsPage />
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <RequireAuth>
+              <AppLayout>
+                <AccountPage />
               </AppLayout>
             </RequireAuth>
           }

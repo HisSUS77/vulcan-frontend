@@ -3,7 +3,16 @@ import axios from "axios";
 
 const baseURL = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000/api/v1";
 
-export const api = axios.create({ baseURL });
+// Debug mode: set to true to see API requests/responses in console
+const DEBUG_API = process.env.NODE_ENV === "development";
+
+export const api = axios.create({ 
+  baseURL,
+  timeout: 30000, // 30 second timeout
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
 
 export const getAccessToken = () =>
   typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
@@ -14,18 +23,58 @@ export const setAccessToken = (t) => {
   else localStorage.setItem("access_token", t);
 };
 
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+export const getCurrentUser = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem("vulcan_user");
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    localStorage.removeItem("vulcan_user");
+    return null;
   }
-  return config;
-});
+};
 
+export const setCurrentUser = (user) => {
+  if (typeof window === "undefined") return;
+  if (!user) localStorage.removeItem("vulcan_user");
+  else localStorage.setItem("vulcan_user", JSON.stringify(user));
+};
+
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    const token = getAccessToken();
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (DEBUG_API) {
+      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data || "");
+    }
+    return config;
+  },
+  (error) => {
+    if (DEBUG_API) {
+      console.error("[API] Request error:", error);
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor
 api.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (DEBUG_API) {
+      console.log(`[API] Response ${res.status}:`, res.data);
+    }
+    return res;
+  },
   async (err) => {
+    if (DEBUG_API) {
+      console.error(`[API] Error ${err?.response?.status}:`, err?.response?.data || err.message);
+    }
+    
     if (err?.response?.status === 401) {
       // Only clear token and logout if it's an auth endpoint or token is actually invalid
       const isAuthEndpoint = err.config?.url?.includes('/auth/');
@@ -40,6 +89,18 @@ api.interceptors.response.use(
         }
       }
     }
+    
+    // Enhance error message for better UX
+    if (err?.response?.data?.detail) {
+      err.userMessage = err.response.data.detail;
+    } else if (err?.code === "ECONNABORTED") {
+      err.userMessage = "Request timed out. Please try again.";
+    } else if (err?.code === "ERR_NETWORK") {
+      err.userMessage = "Cannot connect to server. Please check if the backend is running.";
+    } else {
+      err.userMessage = err.message || "An unexpected error occurred.";
+    }
+    
     return Promise.reject(err);
   }
 );

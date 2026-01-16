@@ -22,20 +22,53 @@ function DashboardPage() {
   const [recentScans, setRecentScans] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setError(null);
       try {
-        const [summaryRes, scansRes, notifRes] = await Promise.all([
+        // Fetch all data in parallel, but handle individual failures gracefully
+        const results = await Promise.allSettled([
           dashboardService.getSummary(),
           dashboardService.getRecentScans(),
           notificationService.getNotifications(1, 10),
         ]);
-        setSummary(summaryRes.data);
-        setRecentScans(scansRes.data || []);
-        setNotifications(notifRes.data?.items || notifRes.data || []);
+        
+        // Handle summary
+        if (results[0].status === "fulfilled") {
+          setSummary(results[0].value.data);
+        }
+        
+        // Handle recent scans
+        if (results[1].status === "fulfilled") {
+          setRecentScans(results[1].value.data || []);
+        } else {
+          // Try sessionStorage fallback for scans
+          const lastScanId = sessionStorage.getItem("lastScanId");
+          if (lastScanId) {
+            const cached = sessionStorage.getItem(`scan_${lastScanId}`);
+            if (cached) {
+              setRecentScans([JSON.parse(cached)]);
+            }
+          }
+        }
+        
+        // Handle notifications
+        if (results[2].status === "fulfilled") {
+          const notifData = results[2].value.data;
+          setNotifications(notifData?.items || notifData || []);
+        }
+        
+        // Check if all failed
+        const allFailed = results.every(r => r.status === "rejected");
+        if (allFailed) {
+          const err = results[0].reason;
+          setError(err?.userMessage || "Failed to load dashboard data. Please check if the backend is running.");
+        }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
+        setError(err?.userMessage || "Failed to load dashboard data.");
       } finally {
         setLoading(false);
       }
@@ -71,7 +104,38 @@ function DashboardPage() {
   };
 
   if (loading) {
-    return <div className="v-dashboard">Loading...</div>;
+    return (
+      <div className="v-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <div style={{ textAlign: 'center', color: '#9ca3af' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
+          <div>Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="v-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+          <div style={{ color: '#f97373', marginBottom: '1rem' }}>{error}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ 
+              background: '#2563eb', 
+              color: '#fff', 
+              padding: '8px 20px', 
+              border: 'none', 
+              borderRadius: '8px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

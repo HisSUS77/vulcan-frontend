@@ -1,18 +1,20 @@
 // src/pages/ScanPage.js
-import React, { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 import { repositoryService, scanService } from "../api/services";
 
-const BRANCHES = ["main", "dev", "feature"];
-
 function ScanPage() {
   const navigate = useNavigate();
-  const [inputMode, setInputMode] = useState("direct"); // direct | repository
+  const [searchParams] = useSearchParams();
+  const initialRepoId = searchParams.get("repoId");
+  
+  const [inputMode, setInputMode] = useState(initialRepoId ? "repository" : "direct"); // direct | repository
   const [directCode, setDirectCode] = useState("");
   const [language, setLanguage] = useState("python");
   const [repositories, setRepositories] = useState([]);
-  const [repository, setRepository] = useState("");
+  const [repository, setRepository] = useState(initialRepoId || "");
+  const [repoBranches, setRepoBranches] = useState([]); // Dynamic branches
   const [branch, setBranch] = useState("main");
   const [scanMode, setScanMode] = useState("deep"); // quick | deep | custom
   const [scanning, setScanning] = useState(false);
@@ -25,22 +27,44 @@ function ScanPage() {
   const [scanSummary, setScanSummary] = useState(null);
   const pollInterval = useRef(null);
 
-  useEffect(() => {
-    fetchRepositories();
-  }, []);
-
-  const fetchRepositories = async () => {
+  const fetchRepositories = useCallback(async () => {
     try {
       const res = await repositoryService.list();
       const repos = res.data || [];
       setRepositories(repos);
       if (repos.length > 0 && !repository) {
-        setRepository(repos[0].id);
+        setRepository(initialRepoId || repos[0].id);
       }
     } catch (err) {
       console.error("Failed to fetch repositories:", err);
     }
-  };
+  }, [repository, initialRepoId]);
+
+  // Fetch branches when repository changes
+  const fetchBranches = useCallback(async (repoId) => {
+    if (!repoId) return;
+    try {
+      const res = await repositoryService.getBranches(repoId);
+      const branches = res.data || ["main"];
+      setRepoBranches(branches);
+      if (branches.length > 0 && !branches.includes(branch)) {
+        setBranch(branches[0]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch branches:", err);
+      setRepoBranches(["main", "dev", "master"]);
+    }
+  }, [branch]);
+
+  useEffect(() => {
+    fetchRepositories();
+  }, [fetchRepositories]);
+
+  useEffect(() => {
+    if (repository && inputMode === "repository") {
+      fetchBranches(repository);
+    }
+  }, [repository, inputMode, fetchBranches]);
 
   // Poll scan status when scanning
   useEffect(() => {
@@ -275,11 +299,6 @@ function ScanPage() {
                   >
                     <option value="python">Python</option>
                     <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
-                    <option value="c">C</option>
-                    <option value="cpp">C++</option>
-                    <option value="go">Go</option>
-                    <option value="php">PHP</option>
                   </select>
                 </div>
                 <div className="vs-field" style={{ marginTop: "1rem" }}>
@@ -331,7 +350,7 @@ function ScanPage() {
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
                   >
-                    {BRANCHES.map((b) => (
+                    {(repoBranches.length > 0 ? repoBranches : ["main"]).map((b) => (
                       <option key={b} value={b}>
                         {b}
                       </option>
