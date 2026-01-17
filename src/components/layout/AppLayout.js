@@ -14,15 +14,17 @@ import {
   FileDiff,
   FileBarChart,
   Search,
+  Users,
 } from "lucide-react";
 
 const navItems = [
-  { label: "Dashboard", to: "/dashboard", icon: <LayoutDashboard size={20} /> },
-  { label: "Repository Integration", to: "/repositories", icon: <FolderGit size={20} /> },
-  { label: "Scan", to: "/scan", icon: <ScanSearch size={20} /> },
-  { label: "Graphs", to: "/graphs", icon: <Share2 size={20} /> },
-  { label: "Patch Generator", to: "/patches", icon: <FileDiff size={20} /> },
-  { label: "Reports", to: "/reports", icon: <FileBarChart size={20} /> },
+  { label: "Dashboard", to: "/dashboard", icon: <LayoutDashboard size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Repository Integration", to: "/repositories", icon: <FolderGit size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Scan", to: "/scan", icon: <ScanSearch size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Graphs", to: "/graphs", icon: <Share2 size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Patch Generator", to: "/patches", icon: <FileDiff size={20} />, roles: ["premium", "admin"] },
+  { label: "Reports", to: "/reports", icon: <FileBarChart size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Users", to: "/admin/users", icon: <Users size={20} />, roles: ["admin"] },
 ];
 
 const sampleRepos = ["frontend-app", "backend-service", "utility-lib"];
@@ -95,18 +97,20 @@ function AppLayout({ children }) {
         </div>
 
         <nav className="v-nav">
-          {navItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={
-                "v-nav-item" + (location.pathname === item.to ? " v-nav-item-active" : "")
-              }
-            >
-              <span className="v-nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {navItems
+            .filter((item) => (item.roles || []).includes(user?.role || "normal"))
+            .map((item) => (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={
+                  "v-nav-item" + (location.pathname === item.to ? " v-nav-item-active" : "")
+                }
+              >
+                <span className="v-nav-icon">{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            ))}
         </nav>
       </aside>
 

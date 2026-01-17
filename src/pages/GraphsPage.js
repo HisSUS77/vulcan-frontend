@@ -11,6 +11,9 @@ function GraphsPage() {
   const [searchParams] = useSearchParams();
   const scanId = searchParams.get("scanId");
   const fileId = searchParams.get("fileId") || "main";
+  const [activeScanId, setActiveScanId] = useState(
+    scanId || sessionStorage.getItem("lastScanId") || null
+  );
   
   const [graphType, setGraphType] = useState("AST");
   const [graphData, setGraphData] = useState(null);
@@ -21,25 +24,28 @@ function GraphsPage() {
   const [error, setError] = useState(null);
   const [showDataFlow, setShowDataFlow] = useState(false);
 
-  // Redirect to scan page if no scanId provided
+  // Resolve scan id without forcing a redirect to /scan
   useEffect(() => {
-    if (!scanId) {
-      const lastScanId = sessionStorage.getItem('lastScanId');
-      if (lastScanId) {
-        navigate(`/graphs?scanId=${lastScanId}&fileId=main`);
-      } else {
-        navigate("/scan");
-      }
+    if (scanId) {
+      setActiveScanId(scanId);
+      return;
+    }
+    const lastScanId = sessionStorage.getItem("lastScanId");
+    if (lastScanId) {
+      setActiveScanId(lastScanId);
+      navigate(`/graphs?scanId=${lastScanId}&fileId=main`, { replace: true });
+    } else {
+      setActiveScanId(null);
     }
   }, [scanId, navigate]);
 
   // Fetch scan summary to get vulnerabilities
   useEffect(() => {
-    if (!scanId) return;
+    if (!activeScanId) return;
     
     const fetchVulnerabilities = async () => {
       try {
-        const response = await scanService.getSummary(scanId);
+        const response = await scanService.getSummary(activeScanId);
         const scanData = response.data || response;
         setVulnerabilities(scanData.vulnerabilities || []);
         if (scanData.vulnerabilities?.length > 0) {
@@ -48,7 +54,7 @@ function GraphsPage() {
       } catch (err) {
         console.error("Failed to fetch vulnerabilities:", err);
         // Try sessionStorage fallback
-        const cached = sessionStorage.getItem(`scan_${scanId}`);
+        const cached = sessionStorage.getItem(`scan_${activeScanId}`);
         if (cached) {
           const scanData = JSON.parse(cached);
           setVulnerabilities(scanData.vulnerabilities || []);
@@ -60,17 +66,17 @@ function GraphsPage() {
     };
 
     fetchVulnerabilities();
-  }, [scanId]);
+  }, [activeScanId]);
 
   // Fetch graph data
   useEffect(() => {
-    if (!scanId) return;
+    if (!activeScanId) return;
     
     const fetchGraph = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await graphService.getGraph(scanId, fileId, graphType);
+        const response = await graphService.getGraph(activeScanId, fileId, graphType);
         const data = response.data || response;
         setGraphData(data);
       } catch (err) {
@@ -83,7 +89,18 @@ function GraphsPage() {
     };
 
     fetchGraph();
-  }, [scanId, fileId, graphType]);
+  }, [activeScanId, fileId, graphType]);
+
+  if (!activeScanId) {
+    return (
+      <div className="v-placeholder-page">
+        <p>No scan selected for graph view.</p>
+        <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
+          Start a scan
+        </button>
+      </div>
+    );
+  }
 
   // Calculate SVG positions for nodes in a circular layout
   const getNodePosition = (index, total, radius = 280) => {
@@ -126,7 +143,7 @@ function GraphsPage() {
           <div style={{ fontSize: '3rem' }}>📊</div>
           <div style={{ fontSize: '1.2rem', color: '#666' }}>{error}</div>
           <div style={{ fontSize: '0.9rem', color: '#999' }}>
-            Graph type: {graphType} | Scan ID: {scanId}
+            Graph type: {graphType} | Scan ID: {activeScanId}
           </div>
         </div>
       );
@@ -368,10 +385,6 @@ function GraphsPage() {
     );
   };
 
-  if (!scanId) {
-    return null;
-  }
-
   return (
     <div className="rv-page" style={{ height: '100vh', overflow: 'hidden' }}>
       {/* Header */}
@@ -393,7 +406,7 @@ function GraphsPage() {
             padding: '2px 8px', 
             borderRadius: '4px',
             color: '#60a5fa'
-          }}>{scanId}</code>
+          }}>{activeScanId}</code>
         </p>
       </div>
 

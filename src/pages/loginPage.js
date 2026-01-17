@@ -136,7 +136,13 @@ function LoginPage() {
         </div>
 
         {/* Social buttons */}
-        <button type="button" className="lp-oauth-btn lp-google-btn">
+        <button
+          type="button"
+          className="lp-oauth-btn lp-google-btn"
+          onClick={() => {
+            window.location.href = authService.googleOAuthUrl();
+          }}
+        >
           <span className="lp-oauth-icon" aria-hidden="true">
             <svg viewBox="0 0 48 48" role="img" aria-label="Google logo">
               <path
@@ -160,7 +166,13 @@ function LoginPage() {
           <span>Sign in with Google</span>
         </button>
 
-        <button type="button" className="lp-oauth-btn lp-github-btn">
+        <button
+          type="button"
+          className="lp-oauth-btn lp-github-btn"
+          onClick={() => {
+            window.location.href = authService.githubOAuthUrl();
+          }}
+        >
           <span className="lp-oauth-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" role="img" aria-label="GitHub logo">
               <path

@@ -12,6 +12,8 @@ export const authService = {
   resetPassword: (token, newPassword) =>
     api.post("/auth/reset-password", { token, new_password: newPassword }),
   validateResetToken: (token) => api.post("/auth/validate-reset-token", { token }),
+  googleOAuthUrl: () => `${api.defaults.baseURL}/auth/oauth/google`,
+  githubOAuthUrl: () => `${api.defaults.baseURL}/auth/oauth/github`,
 };
 
 // ============= DASHBOARD =============
@@ -98,4 +100,10 @@ export const analysisService = {
   buildGraph: (code, language, filename = null) =>
     api.post("/analysis/graph", { code, language, filename }),
   getFindings: () => api.get("/analysis/findings"),
+};
+
+// ============= ADMIN =============
+export const adminService = {
+  listUsers: () => api.get("/admin/users"),
+  updateUserRole: (userId, role) => api.patch(`/admin/users/${userId}`, { role }),
 };

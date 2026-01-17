@@ -7,6 +7,7 @@ import LoginPage from "./pages/loginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import OAuthCallbackPage from "./pages/OAuthCallbackPage";
 import AccountPage from "./pages/AccountPage";
 import DashboardPage from "./pages/DashboardPage";
 import ScanPage from "./pages/ScanPage";
@@ -16,6 +17,8 @@ import PatchGeneratorPage from "./pages/PatchGeneratorPage";
 import ReportsPage from "./pages/ReportsPage";
 import AppLayout from "./components/layout/AppLayout";
 import RequireAuth from "./components/RequireAuth";
+import RequireRole from "./components/RequireRole";
+import AdminUsersPage from "./pages/AdminUsersPage";
 
 function App() {
   return (
@@ -26,6 +29,7 @@ function App() {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
         {/* Layout-wrapped routes (later we can add auth guard) */}
         <Route
@@ -72,9 +76,20 @@ function App() {
           path="/patches"
           element={
             <RequireAuth>
-              <AppLayout>
-                <PatchGeneratorPage />
-              </AppLayout>
+              <RequireRole
+                roles={["premium", "admin"]}
+                fallback={
+                  <AppLayout>
+                    <div className="v-placeholder-page">
+                      Patch generation is a premium feature. Upgrade to Premium to unlock patch suggestions.
+                    </div>
+                  </AppLayout>
+                }
+              >
+                <AppLayout>
+                  <PatchGeneratorPage />
+                </AppLayout>
+              </RequireRole>
             </RequireAuth>
           }
         />
@@ -85,6 +100,18 @@ function App() {
               <AppLayout>
                 <ReportsPage />
               </AppLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["admin"]}>
+                <AppLayout>
+                  <AdminUsersPage />
+                </AppLayout>
+              </RequireRole>
             </RequireAuth>
           }
         />

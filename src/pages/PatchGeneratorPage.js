@@ -9,6 +9,9 @@ export default function PatchGeneratorPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const scanId = searchParams.get("scanId");
+  const [activeScanId, setActiveScanId] = useState(
+    scanId || sessionStorage.getItem("lastScanId") || null
+  );
   //  Component State
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [selectedVuln, setSelectedVuln] = useState("");
@@ -18,10 +21,10 @@ export default function PatchGeneratorPage() {
 
   // 📥 FUNCTION: Fetch Vulnerabilities for Scan
   const fetchVulnerabilities = useCallback(async () => {
-    if (!scanId) return;
+    if (!activeScanId) return;
     try {
       // Call backend to get vulnerability list
-      const res = await patchService.getVulnerabilities(scanId);
+      const res = await patchService.getVulnerabilities(activeScanId);
       const vulns = res.data || [];
       setVulnerabilities(vulns);
       if (vulns.length > 0) setSelectedVuln(vulns[0].id);
@@ -29,7 +32,7 @@ export default function PatchGeneratorPage() {
       console.error("Failed to fetch vulnerabilities from API:", err);
 
       // Fallback to sessionStorage
-      const cached = sessionStorage.getItem(`scan_${scanId}`);
+      const cached = sessionStorage.getItem(`scan_${activeScanId}`);
       if (cached) {
         const scanData = JSON.parse(cached);
         const vulns = scanData.vulnerabilities || [];
@@ -37,22 +40,37 @@ export default function PatchGeneratorPage() {
         if (vulns.length > 0) setSelectedVuln(vulns[0].id);
       }
     }
-  }, [scanId]);
+  }, [activeScanId]);
 
-  // Redirect to scan page if no scanId provided
+  // Resolve scan id without forcing a redirect to /scan
   useEffect(() => {
-    if (!scanId) {
-      // Try to get last scan from sessionStorage
-      const lastScanId = sessionStorage.getItem('lastScanId');
-      if (lastScanId) {
-        navigate(`/patches?scanId=${lastScanId}`);
-      } else {
-        navigate("/scan");
-      }
+    if (scanId) {
+      setActiveScanId(scanId);
       return;
     }
-    fetchVulnerabilities();
+    const lastScanId = sessionStorage.getItem("lastScanId");
+    if (lastScanId) {
+      setActiveScanId(lastScanId);
+      navigate(`/patches?scanId=${lastScanId}`, { replace: true });
+      return;
+    }
+    setActiveScanId(null);
   }, [scanId, navigate, fetchVulnerabilities]);
+
+  useEffect(() => {
+    fetchVulnerabilities();
+  }, [fetchVulnerabilities]);
+
+  if (!activeScanId) {
+    return (
+      <div className="v-placeholder-page">
+        <p>No scan selected for patch generation.</p>
+        <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
+          Start a scan
+        </button>
+      </div>
+    );
+  }
 
   // ⚙️ FUNCTION: Generate New Patch
   const handleGeneratePatch = async () => {
@@ -131,7 +149,7 @@ export default function PatchGeneratorPage() {
             display: 'inline-block',
             marginTop: '0.5rem'
           }}>
-            Scan ID: {scanId}
+            Scan ID: {activeScanId}
           </span>
         </div>
         <button
