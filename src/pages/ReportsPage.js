@@ -78,8 +78,27 @@ export default function ReportsPage() {
           throw apiErr;
         }
       }
+
+      if (!scanData?.vulnerabilities) {
+        const reportRes = await reportService.get(scanId);
+        scanData = {
+          ...(reportRes.data || {}),
+          summary: reportRes.data?.summary || {},
+          vulnerabilities: reportRes.data?.vulnerabilities || [],
+        };
+      }
       
-      setScanSummary(scanData);
+      const normalizedSummary = {
+        ...(scanData.summary || scanData),
+        scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
+        status: scanData.status || scanData.summary?.status,
+        input_type: scanData.input_type || scanData.summary?.input_type,
+        files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
+        total_files: scanData.total_files || scanData.summary?.total_files,
+        duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
+        completed_at: scanData.completed_at || scanData.summary?.completed_at,
+      };
+      setScanSummary(normalizedSummary);
       
       // Map vulnerabilities from backend format
       const vulns = (scanData.vulnerabilities || []).map(v => ({
@@ -107,8 +126,10 @@ export default function ReportsPage() {
       setVulnerabilities(vulns);
       
       // Calculate summary from backend data
-      const bySeverity = scanData.by_severity || {};
-      const total = scanData.vulnerabilities_found || 0;
+      const bySeverity = normalizedSummary.by_severity || {};
+      const total = normalizedSummary.vulnerabilities_found
+        ?? normalizedSummary.total_vulns
+        ?? 0;
       const avgConfidence = vulns.length > 0 
         ? Math.round(vulns.reduce((sum, v) => sum + v.confidence, 0) / vulns.length)
         : 0;
@@ -203,9 +224,10 @@ export default function ReportsPage() {
             {scans.map((s) => {
               const date = new Date(s.created_at).toLocaleDateString();
               const time = new Date(s.created_at).toLocaleTimeString();
+              const vulnCount = s.total_vulns ?? s.vulnerabilities_found ?? 0;
               return (
                 <option key={s.scan_id || s.id} value={s.scan_id || s.id}>
-                  {(s.scan_id || s.id)} - {date} {time} ({s.vulnerabilities_found} vulns)
+                  {(s.scan_id || s.id)} - {date} {time} ({vulnCount} vulns)
                 </option>
               );
             })}
@@ -351,7 +373,7 @@ export default function ReportsPage() {
                 <p><b>Input Type:</b> {scanSummary.input_type}</p>
                 <p><b>Files Scanned:</b> {scanSummary.files_scanned} / {scanSummary.total_files}</p>
                 <p><b>Duration:</b> {scanSummary.duration_seconds?.toFixed(2)}s</p>
-                <p><b>Completed:</b> {new Date(scanSummary.completed_at).toLocaleString()}</p>
+                <p><b>Completed:</b> {scanSummary.completed_at ? new Date(scanSummary.completed_at).toLocaleString() : "N/A"}</p>
               </div>
             )}
           </div>
