@@ -1,5 +1,5 @@
 // src/pages/RepoIntegrationPage.js
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
 import { repositoryService } from "../api/services";
@@ -13,6 +13,7 @@ function RepoIntegrationPage() {
   const [error, setError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [repoBranches, setRepoBranches] = useState({}); // { repoId: [branches] }
+  const [pageMessage, setPageMessage] = useState("");
   const [newRepo, setNewRepo] = useState({
     name: "",
     provider: "GITHUB",
@@ -21,6 +22,10 @@ function RepoIntegrationPage() {
   });
   const [addingRepo, setAddingRepo] = useState(false);
   const [githubStatus, setGithubStatus] = useState("Not connected");
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const checkedGithubRepoRef = useRef(null);
 
   // 📥 FUNCTION: Fetch repositories from API
   const fetchRepositories = useCallback(async () => {
@@ -30,8 +35,23 @@ function RepoIntegrationPage() {
       const res = await repositoryService.list();
       const repos = res.data || [];
       setRepositories(repos);
-      // Fetch branches for each repository
-      repos.forEach((repo) => fetchBranches(repo.id));
+      const branchPromises = repos.map(async (repo) => {
+        try {
+          const resBranches = await repositoryService.getBranches(repo.id);
+          return {
+            id: repo.id,
+            branches: Array.isArray(resBranches.data?.branches) ? resBranches.data.branches : ["main"],
+          };
+        } catch {
+          return { id: repo.id, branches: ["main", "dev", "master"] };
+        }
+      });
+      const branchResults = await Promise.all(branchPromises);
+      const nextBranches = {};
+      branchResults.forEach((item) => {
+        nextBranches[item.id] = item.branches;
+      });
+      setRepoBranches(nextBranches);
     } catch (err) {
       console.error("Failed to fetch repositories:", err);
       const msg = err.response?.data?.detail || "Failed to load repositories.";
@@ -40,21 +60,6 @@ function RepoIntegrationPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 🌿 FUNCTION: Fetch branches for a repository
-  const fetchBranches = useCallback(async (repoId) => {
-    try {
-      const res = await repositoryService.getBranches(repoId);
-      const branches = Array.isArray(res.data?.branches)
-        ? res.data.branches
-        : ["main"];
-      setRepoBranches((prev) => ({ ...prev, [repoId]: branches }));
-    } catch (err) {
-      console.error(`Failed to fetch branches for repo ${repoId}:`, err);
-      // Default to common branches if API fails
-      setRepoBranches((prev) => ({ ...prev, [repoId]: ["main", "dev", "master"] }));
-    }
   }, []);
 
   // 📥 FUNCTION: Fetch repositories on page load
@@ -66,29 +71,26 @@ function RepoIntegrationPage() {
     const githubRepo = repositories.find((repo) => repo.provider === "GITHUB");
     if (!githubRepo) {
       setGithubStatus("Not connected");
+      checkedGithubRepoRef.current = null;
       return;
     }
-    setGithubStatus("Checking...");
-    repositoryService
-      .getFiles(githubRepo.id, repoBranches[githubRepo.id]?.[0] || "main")
-      .then((res) => {
-        const files = Array.isArray(res.data?.files) ? res.data.files : [];
-        setGithubStatus(files.length > 0 ? "Connected" : "Connected");
-      })
-      .catch(() => {
-        setGithubStatus("Not connected");
-      });
-  }, [repositories, repoBranches]);
+    if (checkedGithubRepoRef.current === githubRepo.id) {
+      return;
+    }
+    checkedGithubRepoRef.current = githubRepo.id;
+    setGithubStatus(githubRepo.url ? "Connected" : "Not connected");
+  }, [repositories]);
 
   // ➕ FUNCTION: Add new repository
   const handleAddRepository = async (e) => {
     e.preventDefault();
     if (!newRepo.name.trim()) {
-      alert("Repository name is required.");
+      setPageMessage("Repository name is required.");
       return;
     }
     setAddingRepo(true);
     try {
+      setPageMessage("");
       const payload = {
         name: newRepo.name.trim(),
         provider: newRepo.provider,
@@ -103,7 +105,7 @@ function RepoIntegrationPage() {
     } catch (err) {
       console.error("Failed to add repository:", err);
       const msg = err.response?.data?.detail || "Failed to add repository.";
-      alert(msg);
+      setPageMessage(msg);
     } finally {
       setAddingRepo(false);
     }
@@ -111,15 +113,19 @@ function RepoIntegrationPage() {
 
   // ❌ FUNCTION: Delete repository by ID
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this repository?"))
+    if (!confirmDeleteId) {
+      setConfirmDeleteId(id);
       return;
+    }
     try {
       await repositoryService.delete(id);
       setRepositories((prev) => prev.filter((r) => r.id !== id));
+      setConfirmDeleteId(null);
     } catch (err) {
       console.error("Failed to delete repository:", err);
       const msg = err.response?.data?.detail || "Failed to delete repository.";
-      alert(msg);
+      setPageMessage(msg);
+      setConfirmDeleteId(null);
     }
   };
 
@@ -133,11 +139,13 @@ function RepoIntegrationPage() {
     if (!file) return;
 
     if (file.size > 200 * 1024 * 1024) {
-      alert("File must be under 200 MB.");
+      setUploadMessage("File must be under 200 MB.");
       return;
     }
 
     try {
+      setUploading(true);
+      setUploadMessage("Uploading...");
       // For upload, we need a repo ID. Create a placeholder LOCAL repo first
       const createRes = await repositoryService.create({
         name: file.name.replace(/\.(zip|tar|gz|tar\.gz)$/i, ""),
@@ -147,12 +155,14 @@ function RepoIntegrationPage() {
       const repoId = createRes.data.id;
       // Step 2: Upload the file contents to backend
       await repositoryService.upload(repoId, file);
-      alert("Uploaded successfully!");
+      setUploadMessage("Upload complete. You can scan now.");
       fetchRepositories();
     } catch (err) {
       console.error("Upload failed:", err);
       const msg = err.response?.data?.detail || err.message || "Upload failed";
-      alert("Upload failed: " + msg);
+      setUploadMessage(`Upload failed: ${msg}`);
+    } finally {
+      setUploading(false);
     }
     // Reset file input
     event.target.value = "";
@@ -176,6 +186,7 @@ function RepoIntegrationPage() {
   return (
     <div className="ri-page">
       <h1 className="ri-heading">Repository Integration</h1>
+      {pageMessage && <div className="acct-error" style={{ marginBottom: "1rem" }}>{pageMessage}</div>}
 
       <div className="ri-shell">
         {/* Add new */}
@@ -285,6 +296,11 @@ function RepoIntegrationPage() {
               <div className="ri-upload-sub">
                 ZIP or TAR.GZ, max size 200 MB
               </div>
+              {uploadMessage && (
+                <div style={{ color: uploadMessage.startsWith("Upload failed") ? "#f97373" : "#94a3b8", fontSize: "0.85rem", marginTop: "0.35rem" }}>
+                  {uploadMessage}
+                </div>
+              )}
             </div>
           </label>
           <input
@@ -293,6 +309,7 @@ function RepoIntegrationPage() {
             accept=".zip,.tar,.gz,.tar.gz"
             onChange={handleUpload}
             style={{ display: "none" }}
+            disabled={uploading}
           />
         </div>
 
@@ -319,6 +336,7 @@ function RepoIntegrationPage() {
               ) : (
                 repositories.map((repo) => {
                   const branches = repoBranches[repo.id] || ["main"];
+                  const isRepoUrlMissing = repo.provider !== "LOCAL" && !repo.url;
                   return (
                     <tr key={repo.id}>
                       <td>{repo.name}</td>
@@ -341,7 +359,7 @@ function RepoIntegrationPage() {
                       </td>
                       <td>
                         {repo.last_scan
-                          ? new Date(repo.last_scan).toLocaleDateString()
+                          ? new Date(repo.last_scan).toLocaleString()
                           : "Never"}
                       </td>
                       <td>
@@ -353,6 +371,8 @@ function RepoIntegrationPage() {
                           <button
                             className="ri-scan-link"
                             onClick={() => handleScanNow(repo.id)}
+                            disabled={isRepoUrlMissing}
+                            title={isRepoUrlMissing ? "Add a repository URL to scan." : "Scan now"}
                           >
                             Scan Now
                           </button>
@@ -363,15 +383,35 @@ function RepoIntegrationPage() {
                           className="ri-scan-link"
                           onClick={() => handleScanNow(repo.id)}
                           style={{ marginRight: "0.5rem" }}
+                          disabled={isRepoUrlMissing}
+                          title={isRepoUrlMissing ? "Add a repository URL to scan." : "Scan"}
                         >
                           Scan
                         </button>
-                        <button
-                          className="ri-delete-link"
-                          onClick={() => handleDelete(repo.id)}
-                        >
-                          Delete
-                        </button>
+                        {confirmDeleteId === repo.id ? (
+                          <>
+                            <button
+                              className="ri-delete-link"
+                              onClick={() => handleDelete(repo.id)}
+                              style={{ marginRight: "0.5rem" }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              className="ri-delete-link"
+                              onClick={() => setConfirmDeleteId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="ri-delete-link"
+                            onClick={() => handleDelete(repo.id)}
+                          >
+                            Delete
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

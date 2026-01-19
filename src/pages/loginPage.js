@@ -9,6 +9,9 @@ import "../App.css";
 function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -23,6 +26,19 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const nextErrors = { email: "", password: "" };
+    if (!form.email.includes("@")) {
+      nextErrors.email = "Enter a valid email address.";
+    }
+    if (!form.password || form.password.length < 6) {
+      nextErrors.password = "Password must be at least 6 characters.";
+    }
+    setFieldErrors(nextErrors);
+    if (nextErrors.email || nextErrors.password) {
+      return;
+    }
+    setError("");
+    setLoading(true);
     try {
       // Try real backend login first
       const { data } = await api.post("/auth/login", {
@@ -44,7 +60,9 @@ function LoginPage() {
       throw new Error("No token in response");
     } catch (err) {
       const msg = err?.userMessage || err?.response?.data?.detail || "Login failed. Please check your credentials.";
-      alert(msg);
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,6 +94,7 @@ function LoginPage() {
               onChange={handleChange}
               required
             />
+            {fieldErrors.email && <div className="acct-error" style={{ marginTop: "0.4rem" }}>{fieldErrors.email}</div>}
           </div>
 
           {/* Password */}
@@ -103,12 +122,14 @@ function LoginPage() {
                 )}
               </button>
             </div>
+            {fieldErrors.password && <div className="acct-error" style={{ marginTop: "0.4rem" }}>{fieldErrors.password}</div>}
           </div>
 
           {/* Login button */}
-          <button type="submit" className="lp-primary-btn">
-            Login
+          <button type="submit" className="lp-primary-btn" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
           </button>
+          {error && <div className="acct-error" style={{ marginTop: "0.75rem" }}>{error}</div>}
           <div className="lp-links-row">
             <button
               type="button"

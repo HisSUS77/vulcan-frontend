@@ -1,5 +1,6 @@
 // src/pages/RegisterPage.js
 import React, { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { authService } from "../api/services";
 import { setAccessToken, setCurrentUser } from "../api/client";
@@ -13,6 +14,13 @@ function RegisterPage() {
     password: "",
     confirm: "",
   });
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({
+    email: "",
+    password: "",
+    confirm: "",
+  });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -21,18 +29,22 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const nextErrors = { email: "", password: "", confirm: "" };
     if (form.password !== form.confirm) {
-      alert("Passwords do not match.");
-      return;
+      nextErrors.confirm = "Passwords do not match.";
     }
     if (form.password.length < 6) {
-      alert("Password must be at least 6 characters.");
-      return;
+      nextErrors.password = "Password must be at least 6 characters.";
     }
     if (!form.email.includes("@")) {
-      alert("Please enter a valid email address.");
+      nextErrors.email = "Please enter a valid email address.";
+    }
+    setFieldErrors(nextErrors);
+    if (nextErrors.email || nextErrors.password || nextErrors.confirm) {
       return;
     }
+    setError("");
+    setLoading(true);
     try {
       console.log("[Register] Sending registration request...");
       await authService.register({
@@ -54,7 +66,7 @@ function RegisterPage() {
         return;
       }
       // If no token but registration succeeded, go to login
-      alert("Registration successful! Please login.");
+      setError("Registration successful! Please login.");
       navigate("/login", { replace: true });
     } catch (err) {
       console.error("[Register] Error:", err);
@@ -77,7 +89,9 @@ function RegisterPage() {
       } else if (err?.message) {
         msg = err.message;
       }
-      alert(msg);
+      setError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -117,6 +131,7 @@ function RegisterPage() {
               onChange={handleChange}
               required
             />
+            {fieldErrors.email && <div className="acct-error" style={{ marginTop: "0.4rem" }}>{fieldErrors.email}</div>}
           </div>
 
           <div className="lp-field">
@@ -137,9 +152,14 @@ function RegisterPage() {
                 className="lp-password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword ? (
+                  <EyeOff className="lp-password-icon" aria-hidden="true" />
+                ) : (
+                  <Eye className="lp-password-icon" aria-hidden="true" />
+                )}
               </button>
             </div>
+            {fieldErrors.password && <div className="acct-error" style={{ marginTop: "0.4rem" }}>{fieldErrors.password}</div>}
           </div>
 
           <div className="lp-field">
@@ -154,11 +174,13 @@ function RegisterPage() {
               required
               minLength={6}
             />
+            {fieldErrors.confirm && <div className="acct-error" style={{ marginTop: "0.4rem" }}>{fieldErrors.confirm}</div>}
           </div>
 
-          <button type="submit" className="lp-primary-btn">
-            Create account
+          <button type="submit" className="lp-primary-btn" disabled={loading}>
+            {loading ? "Creating..." : "Create account"}
           </button>
+          {error && <div className="acct-error" style={{ marginTop: "0.75rem" }}>{error}</div>}
         </form>
 
         <button

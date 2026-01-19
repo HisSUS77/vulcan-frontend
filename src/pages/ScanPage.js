@@ -31,21 +31,44 @@ function ScanPage() {
   const [currentScanId, setCurrentScanId] = useState(null);
   const [scanSummary, setScanSummary] = useState(null);
   const pollInterval = useRef(null);
+  const lineCount = directCode.split("\n").length;
+  const lineCountColor = lineCount > 390 ? "#f97373" : lineCount > 360 ? "#f59e0b" : "#888";
+  const [resumeScanId, setResumeScanId] = useState(null);
+  const [resumeStatus, setResumeStatus] = useState("");
 
   useEffect(() => {
-    const savedScanId = localStorage.getItem("lastScanId");
-    if (savedScanId && !currentScanId) {
-      const cached = localStorage.getItem(`scan_${savedScanId}`);
-      if (cached) {
-        try {
-          setScanSummary(JSON.parse(cached));
-          setCurrentScanId(savedScanId);
-        } catch {
-          // ignore corrupted cache
-        }
-      }
+    if (currentScanId || scanning) return;
+    const lastScanId = localStorage.getItem("lastScanId");
+    if (!lastScanId) return;
+    const cached = localStorage.getItem(`scan_${lastScanId}`);
+    if (!cached) return;
+    try {
+      const summary = JSON.parse(cached);
+      setCurrentScanId(lastScanId);
+      setScanSummary(summary);
+    } catch (err) {
+      console.error("Failed to restore cached scan summary:", err);
     }
-  }, [currentScanId]);
+  }, [currentScanId, scanning]);
+
+  useEffect(() => {
+    const checkResume = async () => {
+      const lastScanId = localStorage.getItem("lastScanId");
+      if (!lastScanId) return;
+      if (currentScanId || scanning) return;
+      try {
+        const statusRes = await scanService.getStatus(lastScanId);
+        const status = statusRes.data;
+        if (["PENDING", "RUNNING"].includes(status.state)) {
+          setResumeScanId(lastScanId);
+          setResumeStatus(status.state);
+        }
+      } catch {
+        // ignore resume errors
+      }
+    };
+    checkResume();
+  }, [currentScanId, scanning]);
 
   const fetchRepositories = useCallback(async () => {
     try {
@@ -174,7 +197,11 @@ function ScanPage() {
             };
             setLogs(prev => [...prev, summaryLog]);
             
-            setToast("Scan completed successfully.");
+            if (summary.total_files === 0) {
+              setToast("No scannable files found in the repository.");
+            } else {
+              setToast("Scan completed successfully.");
+            }
           } else {
             setToast(`Scan ${status.state.toLowerCase()}.`);
           }
@@ -210,21 +237,21 @@ function ScanPage() {
     // Validation based on input mode
     if (inputMode === "direct") {
       if (!directCode.trim()) {
-        alert("Please enter code to scan.");
+        setToast("Please enter code to scan.");
         return;
       }
       const lineCount = directCode.split('\n').length;
       if (lineCount > 400) {
-        alert("Code exceeds 400-line limit. Please reduce the code size.");
+        setToast("Code exceeds 400-line limit. Please reduce the code size.");
         return;
       }
     } else if (inputMode === "repository") {
       if (!repository) {
-        alert("Please select a repository.");
+        setToast("Please select a repository.");
         return;
       }
       if (scanScope === "selected" && selectedFiles.length === 0) {
-        alert("Please select at least one file to scan.");
+        setToast("Please select at least one file to scan.");
         return;
       }
     }
@@ -265,7 +292,7 @@ function ScanPage() {
         || err.response?.data?.message 
         || err.message 
         || "Unknown error occurred";
-      alert("Failed to start scan: " + (typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)));
+      setToast("Failed to start scan: " + (typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage)));
     }
   };
 
@@ -316,6 +343,36 @@ function ScanPage() {
     <div className="vs-page">
       {/* Optional mini-toast */}
       {toast && <div className="vs-toast">{toast}</div>}
+
+      {resumeScanId && !scanning && (
+        <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0b1220", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            Resume in-progress scan: <strong>{resumeScanId}</strong> · {resumeStatus}
+          </div>
+          <button
+            type="button"
+            className="vs-view-graph-btn"
+            onClick={() => {
+              setCurrentScanId(resumeScanId);
+              setScanning(true);
+              setResumeScanId(null);
+            }}
+          >
+            Resume
+          </button>
+        </div>
+      )}
+
+      {!scanning && currentScanId && scanSummary && (
+        <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0f172a", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            Last scan: <strong>{currentScanId}</strong> · {scanSummary.vulnerabilities_found || 0} vulns
+          </div>
+          <button type="button" className="vs-view-graph-btn" onClick={handleViewGraph}>
+            View last graph
+          </button>
+        </div>
+      )}
 
       {/* Header strip */}
       <div className="vs-header">
@@ -374,8 +431,8 @@ function ScanPage() {
                 <div className="vs-field" style={{ marginTop: "1rem" }}>
                   <div className="vs-label" style={{ display: "flex", justifyContent: "space-between" }}>
                     <span>Enter Code (Max 400 lines)</span>
-                    <span style={{ fontSize: "0.85rem", color: "#888" }}>
-                      {directCode.split('\n').length} / 400 lines
+                    <span style={{ fontSize: "0.85rem", color: lineCountColor }}>
+                      {lineCount} / 400 lines
                     </span>
                   </div>
                   <textarea

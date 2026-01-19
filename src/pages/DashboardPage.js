@@ -25,18 +25,18 @@ function DashboardPage() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let mounted = true;
     const fetchData = async () => {
       setError(null);
-      let fallbackTimer = setTimeout(() => {
-        setLoading(false);
-      }, 600);
       try {
         const lastScanId = localStorage.getItem("lastScanId");
         if (lastScanId) {
           const cached = localStorage.getItem(`scan_${lastScanId}`);
           if (cached) {
             try {
-              setRecentScans([JSON.parse(cached)]);
+              if (mounted) {
+                setRecentScans([JSON.parse(cached)]);
+              }
             } catch {
               // ignore cache parsing failures
             }
@@ -50,12 +50,12 @@ function DashboardPage() {
         ]);
         
         // Handle summary
-        if (results[0].status === "fulfilled") {
+        if (mounted && results[0].status === "fulfilled") {
           setSummary(results[0].value.data);
         }
         
         // Handle recent scans
-        if (results[1].status === "fulfilled") {
+        if (mounted && results[1].status === "fulfilled") {
           setRecentScans(results[1].value.data || []);
         } else {
           // Try localStorage fallback for scans
@@ -63,13 +63,15 @@ function DashboardPage() {
           if (lastScanId) {
             const cached = localStorage.getItem(`scan_${lastScanId}`);
             if (cached) {
-              setRecentScans([JSON.parse(cached)]);
+              if (mounted) {
+                setRecentScans([JSON.parse(cached)]);
+              }
             }
           }
         }
         
         // Handle notifications
-        if (results[2].status === "fulfilled") {
+        if (mounted && results[2].status === "fulfilled") {
           const notifData = results[2].value.data;
           setNotifications(notifData?.items || notifData || []);
         }
@@ -78,19 +80,25 @@ function DashboardPage() {
         const allFailed = results.every(r => r.status === "rejected");
         if (allFailed) {
           const err = results[0].reason;
-          setError(err?.userMessage || "Failed to load dashboard data. Please check if the backend is running.");
+          if (mounted) {
+            setError(err?.userMessage || "Failed to load dashboard data. Please check if the backend is running.");
+          }
         }
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
-        setError(err?.userMessage || "Failed to load dashboard data.");
-      } finally {
-        if (fallbackTimer) {
-          clearTimeout(fallbackTimer);
+        if (mounted) {
+          setError(err?.userMessage || "Failed to load dashboard data.");
         }
-        setLoading(false);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
     fetchData();
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const severityData = summary
@@ -134,10 +142,26 @@ function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="v-dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <div style={{ textAlign: 'center', color: '#9ca3af' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
-          <div>Loading dashboard...</div>
+      <div className="v-dashboard" style={{ minHeight: '400px' }}>
+        <div className="v-row">
+          {[0, 1].map((idx) => (
+            <section key={idx} className="v-card v-card-wide">
+              <div style={{ padding: "1.5rem" }}>
+                <div style={{ height: "20px", width: "40%", background: "#1f2937", borderRadius: "8px", marginBottom: "1rem" }} />
+                <div style={{ height: "180px", background: "#0f172a", borderRadius: "12px" }} />
+              </div>
+            </section>
+          ))}
+        </div>
+        <div className="v-row v-row-bottom">
+          {[0, 1, 2].map((idx) => (
+            <section key={idx} className="v-card">
+              <div style={{ padding: "1.5rem" }}>
+                <div style={{ height: "18px", width: "50%", background: "#1f2937", borderRadius: "8px", marginBottom: "1rem" }} />
+                <div style={{ height: "120px", background: "#0f172a", borderRadius: "12px" }} />
+              </div>
+            </section>
+          ))}
         </div>
       </div>
     );
@@ -204,7 +228,12 @@ function DashboardPage() {
                 </div>
               ))
             ) : (
-              <p style={{ padding: "1rem", color: "#999" }}>No recent scans</p>
+              <div style={{ padding: "1rem", color: "#999" }}>
+                <p style={{ margin: 0, marginBottom: "0.5rem" }}>No recent scans</p>
+                <button type="button" className="v-secondary-btn" onClick={handleScanNow}>
+                  Run your first scan
+                </button>
+              </div>
             )}
           </div>
         </section>
@@ -241,13 +270,14 @@ function DashboardPage() {
           </header>
           <div className="v-patch-rate">
             <span className="v-patch-rate-main">
-              {summary?.ai?.patch_success_rate
-                ? Math.round(summary.ai.patch_success_rate * 100)
-                : 0}
-              %
+              {summary?.ai?.patch_success_rate !== undefined
+                ? `${Math.round(summary.ai.patch_success_rate * 100)}%`
+                : "N/A"}
             </span>
             <span className="v-patch-rate-sub">
-              {summary?.totals?.patches_applied || 0} Patches Applied
+              {summary?.ai?.patch_success_rate !== undefined
+                ? `${summary?.totals?.patches_applied || 0} Patches Applied`
+                : "Patch analytics pending"}
             </span>
             <button
               type="button"

@@ -18,6 +18,13 @@ export default function PatchGeneratorPage() {
   const [patches, setPatches] = useState([]);
   const [selectedPatch, setSelectedPatch] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(""), 2500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // 📥 FUNCTION: Fetch Vulnerabilities for Scan
   const fetchVulnerabilities = useCallback(async () => {
@@ -85,7 +92,7 @@ export default function PatchGeneratorPage() {
       setSelectedPatch(newPatch); // Auto-select newly generated patch
     } catch (err) {
       console.error("Failed to generate patch:", err);
-      alert("Failed to generate patch.");
+      setToast("Failed to generate patch.");
     } finally {
       setLoading(false);
     }
@@ -95,10 +102,10 @@ export default function PatchGeneratorPage() {
     if (!selectedPatch) return;
     try {
       await patchService.apply(selectedPatch.id);
-      alert("Patch applied successfully!");
+      setToast("Patch applied successfully!");
     } catch (err) {
       console.error("Failed to apply patch:", err);
-      alert("Failed to apply patch.");
+      setToast("Failed to apply patch.");
     }
   };
   // 📤 FUNCTION: Export Patch as .diff File
@@ -116,7 +123,7 @@ export default function PatchGeneratorPage() {
       a.click();
     } catch (err) {
       console.error("Failed to export patch:", err);
-      alert("Failed to export patch.");
+      setToast("Failed to export patch.");
     }
   };
   // 🔄 FUNCTION: Re-generate Patch with AI Again
@@ -125,15 +132,16 @@ export default function PatchGeneratorPage() {
     try {
       const res = await patchService.regenerate(selectedPatch.id);
       setSelectedPatch(res.data);
-      alert("Patch regenerated!");
+      setToast("Patch regenerated!");
     } catch (err) {
       console.error("Failed to regenerate patch:", err);
-      alert("Failed to regenerate patch.");
+      setToast("Failed to regenerate patch.");
     }
   };
 
   return (
     <div className="pg-wrapper">
+      {toast && <div className="vs-toast">{toast}</div>}
 
       {/* Page Heading */}
       <div className="pg-heading-row">

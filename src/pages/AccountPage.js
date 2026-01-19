@@ -12,6 +12,10 @@ function AccountPage() {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
   const [saving, setSaving] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [toast, setToast] = useState("");
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteNotice, setDeleteNotice] = useState("");
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -23,6 +27,7 @@ function AccountPage() {
       setFullName(res.data?.full_name || "");
       setAvatarUrl(res.data?.avatar_url || "");
       setIsEditingName(false);
+      setShowEditConfirm(false);
     } catch (err) {
       setError("Failed to load profile.");
     } finally {
@@ -66,6 +71,8 @@ function AccountPage() {
       setUser(res.data);
       setCurrentUser(res.data);
       setIsEditingName(false);
+      setToast("Profile updated.");
+      setTimeout(() => setToast(""), 2500);
     } catch (err) {
       setError("Failed to update profile.");
     } finally {
@@ -74,10 +81,7 @@ function AccountPage() {
   };
 
   const handleEditName = () => {
-    const ok = window.confirm("Do you want to edit your name?");
-    if (ok) {
-      setIsEditingName(true);
-    }
+    setShowEditConfirm(true);
   };
 
   return (
@@ -95,6 +99,7 @@ function AccountPage() {
 
         {loading && <div className="acct-muted">Loading profile...</div>}
         {error && <div className="acct-error">{error}</div>}
+        {toast && <div className="acct-muted" style={{ color: "#22c55e" }}>{toast}</div>}
 
         {!loading && !error && (
           <div className="acct-grid">
@@ -138,6 +143,7 @@ function AccountPage() {
                   onChange={handleAvatarChange}
                   style={{ display: "none" }}
                 />
+                <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>PNG/JPG, max 2MB</span>
               </div>
             </div>
             <div className="acct-row">
@@ -168,14 +174,36 @@ function AccountPage() {
                     {fullName || "-"}
                   </span>
                 )}
-                <button
-                  type="button"
-                  className="acct-refresh-btn"
-                  onClick={handleEditName}
-                  disabled={isEditingName}
-                >
-                  Edit
-                </button>
+                {showEditConfirm && !isEditingName ? (
+                  <>
+                    <button
+                      type="button"
+                      className="acct-refresh-btn"
+                      onClick={() => {
+                        setIsEditingName(true);
+                        setShowEditConfirm(false);
+                      }}
+                    >
+                      Allow
+                    </button>
+                    <button
+                      type="button"
+                      className="acct-refresh-btn"
+                      onClick={() => setShowEditConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="acct-refresh-btn"
+                    onClick={handleEditName}
+                    disabled={isEditingName}
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
             <div className="acct-row">
@@ -197,6 +225,46 @@ function AccountPage() {
                 {saving ? "Saving..." : "Save changes"}
               </button>
             </div>
+            <div className="acct-row">
+              <span className="acct-label">Delete account</span>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
+                {showDeleteConfirm ? (
+                  <>
+                    <button
+                      type="button"
+                      className="acct-refresh-btn"
+                      onClick={() => {
+                        setDeleteNotice("Account deletion is handled manually. Please contact support.");
+                        setShowDeleteConfirm(false);
+                      }}
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      type="button"
+                      className="acct-refresh-btn"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="acct-refresh-btn"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    Request delete
+                  </button>
+                )}
+              </div>
+            </div>
+            {deleteNotice && (
+              <div className="acct-row">
+                <span className="acct-label"></span>
+                <span className="acct-value" style={{ color: "#f59e0b" }}>{deleteNotice}</span>
+              </div>
+            )}
           </div>
         )}
       </div>

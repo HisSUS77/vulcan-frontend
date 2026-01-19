@@ -1,17 +1,22 @@
 // src/pages/ReportsPage.js
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { reportService, scanService } from "../api/services";
 import "../App.css";
 
 export default function ReportsPage() {
+  const navigate = useNavigate();
   const [scans, setScans] = useState([]);
   const [vulnerabilities, setVulnerabilities] = useState([]);
-  const [selectedScan, setSelectedScan] = useState(null);
+  const [selectedScan, setSelectedScan] = useState(
+    localStorage.getItem("lastScanId")
+  );
   const [scanSummary, setScanSummary] = useState(null);
   const [filterBy, setFilterBy] = useState("Severity");
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
   const [selectedVuln, setSelectedVuln] = useState(null);
+  const [exportMessage, setExportMessage] = useState("");
 
   useEffect(() => {
     fetchScans();
@@ -20,6 +25,20 @@ export default function ReportsPage() {
   useEffect(() => {
     if (selectedScan) {
       fetchScanData(selectedScan);
+    }
+  }, [selectedScan]);
+
+  useEffect(() => {
+    if (selectedScan) {
+      localStorage.setItem("lastScanId", selectedScan);
+    }
+  }, [selectedScan]);
+
+  useEffect(() => {
+    if (!selectedScan) {
+      setScanSummary(null);
+      setVulnerabilities([]);
+      setSummary({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
     }
   }, [selectedScan]);
 
@@ -41,8 +60,13 @@ export default function ReportsPage() {
       }
       
       setScans(scanList);
-      if (scanList.length > 0) {
-        setSelectedScan(scanList[0].scan_id || scanList[0].id);
+      if (!selectedScan && scanList.length > 0) {
+        const stored = localStorage.getItem("lastScanId");
+        const match = stored && scanList.find((s) => (s.scan_id || s.id) === stored);
+        setSelectedScan(match ? (match.scan_id || match.id) : (scanList[0].scan_id || scanList[0].id));
+      }
+      if (scanList.length === 0) {
+        setSelectedScan(selectedScan || null);
       }
     } catch (err) {
       console.error("Failed to fetch scans:", err);
@@ -53,7 +77,6 @@ export default function ReportsPage() {
         if (cachedScan) {
           const scanData = JSON.parse(cachedScan);
           setScans([scanData]);
-          setSelectedScan(scanData.scan_id);
         }
       }
     } finally {
@@ -128,8 +151,8 @@ export default function ReportsPage() {
       // Calculate summary from backend data
       const bySeverity = normalizedSummary.by_severity || {};
       const total = normalizedSummary.vulnerabilities_found
-        ?? normalizedSummary.total_vulns
-        ?? 0;
+        | normalizedSummary.total_vulns
+        | 0;
       const avgConfidence = vulns.length > 0 
         ? Math.round(vulns.reduce((sum, v) => sum + v.confidence, 0) / vulns.length)
         : 0;
@@ -189,9 +212,9 @@ export default function ReportsPage() {
     } catch (err) {
       console.error("Failed to export PDF:", err);
       if (err.response?.status === 404) {
-        alert("Scan not found or not completed yet.");
+        setExportMessage("Scan not found or not completed yet.");
       } else {
-        alert("Failed to generate PDF report. Please try again.");
+        setExportMessage("Failed to generate PDF report. Please try again.");
       }
     }
   };
@@ -224,7 +247,7 @@ export default function ReportsPage() {
             {scans.map((s) => {
               const date = new Date(s.created_at).toLocaleDateString();
               const time = new Date(s.created_at).toLocaleTimeString();
-              const vulnCount = s.total_vulns ?? s.vulnerabilities_found ?? 0;
+              const vulnCount = s.total_vulns | s.vulnerabilities_found | 0;
               return (
                 <option key={s.scan_id || s.id} value={s.scan_id || s.id}>
                   {(s.scan_id || s.id)} - {date} {time} ({vulnCount} vulns)
@@ -235,11 +258,25 @@ export default function ReportsPage() {
         </div>
 
         <div className="rv-top-actions">
-          <button className="rv-top-btn" onClick={handleExportJSON}>Export JSON</button>
-          <button className="rv-top-btn" onClick={handleExportCSV}>Export CSV</button>
-          <button className="rv-top-btn primary" onClick={handleExportPDF}>Export PDF</button>
+          <button className="rv-top-btn" onClick={handleExportJSON} disabled={!vulnerabilities.length}>Export JSON</button>
+          <button className="rv-top-btn" onClick={handleExportCSV} disabled={!vulnerabilities.length}>Export CSV</button>
+          <button className="rv-top-btn primary" onClick={handleExportPDF} disabled={!vulnerabilities.length}>Export PDF</button>
         </div>
       </div>
+      {exportMessage && (
+        <div className="acct-error" style={{ marginBottom: "1rem" }}>{exportMessage}</div>
+      )}
+
+      {scanSummary ? (
+        <div style={{ marginBottom: "1rem", color: "#94a3b8", fontSize: "0.95rem" }}>
+          Input type: <strong>{scanSummary.input_type || "N/A"}</strong> | Files scanned:{" "}
+          <strong>{scanSummary.files_scanned || 0}/{scanSummary.total_files || 0}</strong>
+        </div>
+      ) : (
+        <div style={{ marginBottom: "1rem", color: "#94a3b8", fontSize: "0.95rem" }}>
+          Input type: <strong>-</strong> | Files scanned: <strong>-</strong>
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="rv-summary-row">
@@ -268,6 +305,15 @@ export default function ReportsPage() {
           <div className="rv-summary-value rv-accuracy">{summary.accuracy}%</div>
         </div>
       </div>
+
+      {!scans.length && (
+        <div style={{ padding: "1.5rem", background: "#0f172a", borderRadius: "12px", border: "1px solid #1f2937", marginBottom: "1.5rem" }}>
+          <div style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "0.75rem" }}>No report yet.</div>
+          <button className="rv-top-btn primary" onClick={() => navigate("/scan")}>
+            Run a scan
+          </button>
+        </div>
+      )}
 
       {/* Main content row */}
       <div className="rv-main">
@@ -306,12 +352,18 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody>
-                {vulnerabilities.length > 0 ? (
+                {!selectedScan ? (
+                  <tr>
+                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5 }}>
+                      Select a scan to view its report.
+                    </td>
+                  </tr>
+                ) : vulnerabilities.length > 0 ? (
                   vulnerabilities.map((row) => (
-                    <tr 
+                    <tr
                       key={row.id}
                       onClick={() => setSelectedVuln(selectedVuln?.id === row.id ? null : row)}
-                      style={{ 
+                      style={{
                         cursor: 'pointer',
                         backgroundColor: selectedVuln?.id === row.id ? '#f0f7ff' : 'transparent'
                       }}
@@ -337,7 +389,7 @@ export default function ReportsPage() {
                       <td className="rv-mono">{row.line}</td>
                       <td>{row.confidence}%</td>
                       <td>
-                        <button 
+                        <button
                           className="rv-tag rv-tag-status pending"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -366,7 +418,7 @@ export default function ReportsPage() {
         <div className="rv-side">
           <div className="rv-side-card">
             <div className="rv-side-title">Scan Info</div>
-            {scanSummary && (
+            {scanSummary ? (
               <div style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>
                 <p><b>Scan ID:</b> {scanSummary.scan_id}</p>
                 <p><b>Status:</b> {scanSummary.status}</p>
@@ -374,6 +426,10 @@ export default function ReportsPage() {
                 <p><b>Files Scanned:</b> {scanSummary.files_scanned} / {scanSummary.total_files}</p>
                 <p><b>Duration:</b> {scanSummary.duration_seconds?.toFixed(2)}s</p>
                 <p><b>Completed:</b> {scanSummary.completed_at ? new Date(scanSummary.completed_at).toLocaleString() : "N/A"}</p>
+              </div>
+            ) : (
+              <div style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#94a3b8' }}>
+                Select a scan to see details.
               </div>
             )}
           </div>

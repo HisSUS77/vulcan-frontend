@@ -17,11 +17,15 @@ function GraphsPage() {
   
   const [graphType, setGraphType] = useState("AST");
   const [graphData, setGraphData] = useState(null);
+  const [lastGraphData, setLastGraphData] = useState(null);
   const [availableFiles, setAvailableFiles] = useState([]);
   const [activeFileId, setActiveFileId] = useState(fileId || "main");
   const [activeFilePath, setActiveFilePath] = useState(null);
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [selectedVuln, setSelectedVuln] = useState(null);
+  const [scanSummary, setScanSummary] = useState(null);
+  const [lastScanSummary, setLastScanSummary] = useState(null);
+  const [lastScanId, setLastScanId] = useState(scanId || null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
   const [initialLoad, setInitialLoad] = useState(true);
@@ -37,14 +41,14 @@ function GraphsPage() {
       setActiveScanId(scanId);
       return;
     }
-    const lastScanId = localStorage.getItem("lastScanId");
-    if (lastScanId) {
-      setActiveScanId(lastScanId);
-      navigate(`/graphs?scanId=${lastScanId}&fileId=main`, { replace: true });
-    } else {
-      setActiveScanId(null);
+    const stored = localStorage.getItem("lastScanId");
+    if (stored) {
+      setActiveScanId(stored);
+      navigate(`/graphs?scanId=${stored}&fileId=${activeFileId}`, { replace: true });
+      return;
     }
-  }, [scanId, navigate]);
+    setActiveScanId(null);
+  }, [scanId, navigate, activeFileId]);
 
   useEffect(() => {
     if (fileId && fileId !== activeFileId) {
@@ -56,6 +60,25 @@ function GraphsPage() {
     setInitialLoad(true);
     setLoading(true);
   }, [activeScanId, activeFileId]);
+
+  useEffect(() => {
+    if (activeScanId) {
+      setLastScanId(activeScanId);
+      localStorage.setItem("lastScanId", activeScanId);
+    }
+  }, [activeScanId]);
+
+  useEffect(() => {
+    if (graphData) {
+      setLastGraphData(graphData);
+    }
+  }, [graphData]);
+
+  useEffect(() => {
+    if (scanSummary) {
+      setLastScanSummary(scanSummary);
+    }
+  }, [scanSummary]);
 
   useEffect(() => {
     setSelectedNode(null);
@@ -71,6 +94,20 @@ function GraphsPage() {
       try {
         const response = await scanService.getSummary(activeScanId);
         const scanData = response.data || response;
+        const normalizedSummary = {
+          ...(scanData.summary || scanData),
+          scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
+          status: scanData.status || scanData.summary?.status,
+          input_type: scanData.input_type || scanData.summary?.input_type,
+          files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
+          total_files: scanData.total_files || scanData.summary?.total_files,
+          duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
+          completed_at: scanData.completed_at || scanData.summary?.completed_at,
+          by_severity: scanData.by_severity || scanData.summary?.by_severity,
+          vulnerabilities_found: scanData.vulnerabilities_found || scanData.summary?.vulnerabilities_found,
+          total_vulns: scanData.total_vulns || scanData.summary?.total_vulns
+        };
+        setScanSummary(normalizedSummary);
         setVulnerabilities(scanData.vulnerabilities || []);
         if (scanData.vulnerabilities?.length > 0) {
           setSelectedVuln(scanData.vulnerabilities[0]);
@@ -83,6 +120,20 @@ function GraphsPage() {
         const cached = localStorage.getItem(`scan_${activeScanId}`);
         if (cached) {
           const scanData = JSON.parse(cached);
+          const normalizedSummary = {
+            ...(scanData.summary || scanData),
+            scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
+            status: scanData.status || scanData.summary?.status,
+            input_type: scanData.input_type || scanData.summary?.input_type,
+            files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
+            total_files: scanData.total_files || scanData.summary?.total_files,
+            duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
+            completed_at: scanData.completed_at || scanData.summary?.completed_at,
+            by_severity: scanData.by_severity || scanData.summary?.by_severity,
+            vulnerabilities_found: scanData.vulnerabilities_found || scanData.summary?.vulnerabilities_found,
+            total_vulns: scanData.total_vulns || scanData.summary?.total_vulns
+          };
+          setScanSummary(normalizedSummary);
           setVulnerabilities(scanData.vulnerabilities || []);
           if (scanData.vulnerabilities?.length > 0) {
             setSelectedVuln(scanData.vulnerabilities[0]);
@@ -140,22 +191,44 @@ function GraphsPage() {
     fetchGraph();
   }, [activeScanId, activeFileId, graphType]);
 
-  const visibleVulnerabilities = activeFilePath
-    ? vulnerabilities.filter((vuln) => {
-        const path = vuln.location?.file || "";
-        return path === activeFilePath || path.endsWith(`/${activeFilePath}`) || path.endsWith(`\\${activeFilePath}`);
-      })
-    : vulnerabilities;
+  const vulnerabilitiesForSelector = vulnerabilities;
 
   useEffect(() => {
-    if (visibleVulnerabilities.length === 0) {
+    if (vulnerabilitiesForSelector.length === 0) {
       setSelectedVuln(null);
       return;
     }
-    if (!selectedVuln || !visibleVulnerabilities.find((v) => v.id === selectedVuln.id)) {
-      setSelectedVuln(visibleVulnerabilities[0]);
+    if (!selectedVuln || !vulnerabilitiesForSelector.find((v) => v.id === selectedVuln.id)) {
+      setSelectedVuln(vulnerabilitiesForSelector[0]);
     }
-  }, [visibleVulnerabilities, selectedVuln]);
+  }, [vulnerabilitiesForSelector, selectedVuln]);
+
+  useEffect(() => {
+    if (!selectedVuln?.evidence?.data_flow_path?.length) return;
+    if (graphType === "CPG") return;
+    setLastGraphType(graphType);
+    setGraphType("CPG");
+  }, [selectedVuln, graphType]);
+
+  useEffect(() => {
+    if (!selectedVuln || !availableFiles.length || !activeScanId) return;
+    const vulnFile = selectedVuln.location?.file;
+    if (!vulnFile) return;
+    const normalizedVuln = vulnFile.replace("\\", "/");
+    const match = availableFiles.find((file) => {
+      const filePath = (file.path || "").replace("\\", "/");
+      if (!filePath) return false;
+      return (
+        filePath === normalizedVuln
+        || filePath.endsWith(`/${normalizedVuln}`)
+        || normalizedVuln.endsWith(`/${filePath}`)
+      );
+    });
+    if (match && match.id && match.id !== activeFileId) {
+      setActiveFileId(match.id);
+      navigate(`/graphs?scanId=${activeScanId}&fileId=${match.id}`, { replace: true });
+    }
+  }, [selectedVuln, availableFiles, activeFileId, activeScanId, navigate]);
 
   const enablePathView = () => {
     if (graphType !== "CPG") {
@@ -170,16 +243,67 @@ function GraphsPage() {
     }
   };
 
-  if (!activeScanId) {
-    return (
-      <div className="v-placeholder-page">
-        <p>No scan selected for graph view.</p>
-        <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
-          Start a scan
-        </button>
-      </div>
-    );
-  }
+  const resetView = () => {
+    setSelectedNode(null);
+    setShowDataFlow(false);
+    setShowOnlyPath(false);
+    if (graphType === "CPG") {
+      setGraphType(lastGraphType || "AST");
+    }
+  };
+
+  const clearView = () => {
+    setGraphData(null);
+    setLastGraphData(null);
+    setAvailableFiles([]);
+    setActiveFilePath(null);
+    setVulnerabilities([]);
+    setSelectedVuln(null);
+    setSelectedNode(null);
+    setScanSummary(null);
+    setLastScanSummary(null);
+    setLastScanId(null);
+    setShowDataFlow(false);
+    setShowOnlyPath(false);
+    setError(null);
+    setLoading(false);
+    setInitialLoad(false);
+  };
+
+  const hasScan = Boolean(activeScanId);
+  const displayGraphData = graphData || lastGraphData;
+  const displayScanId = activeScanId || lastScanId || "none";
+  const displaySummary = scanSummary || lastScanSummary;
+
+  const severityCountsFromVulns = vulnerabilities.reduce(
+    (acc, vuln) => {
+      const key = (vuln.severity || "").toLowerCase();
+      if (acc[key] !== undefined) {
+        acc[key] += 1;
+      }
+      acc.total += 1;
+      return acc;
+    },
+    { total: 0, critical: 0, high: 0, medium: 0, low: 0 }
+  );
+
+  const summaryBySeverity = displaySummary?.by_severity || {};
+  const summaryCounts = {
+    total: Number(
+      displaySummary?.vulnerabilities_found ??
+        displaySummary?.total_vulns ??
+        severityCountsFromVulns.total
+    ),
+    critical: summaryBySeverity.critical ?? severityCountsFromVulns.critical,
+    high: summaryBySeverity.high ?? severityCountsFromVulns.high,
+    medium: summaryBySeverity.medium ?? severityCountsFromVulns.medium,
+    low: summaryBySeverity.low ?? severityCountsFromVulns.low
+  };
+  const showSidePanel = Boolean(selectedNode || selectedVuln || displaySummary);
+  const durationSeconds = Number(displaySummary?.duration_seconds);
+  const durationLabel = Number.isFinite(durationSeconds)
+    ? `${durationSeconds.toFixed(2)}s`
+    : "N/A";
 
   // Calculate SVG positions for nodes in a circular layout
   const getNodePosition = (index, total, radius = 280) => {
@@ -194,7 +318,26 @@ function GraphsPage() {
 
   // Render the graph visualization
   const renderGraph = () => {
-    if ((loading || initialLoad) && (!graphData || !graphData.nodes || graphData.nodes.length === 0)) {
+    if (!hasScan && !displayGraphData) {
+      return (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '500px',
+          gap: '1rem',
+          color: '#94a3b8'
+        }}>
+          <div style={{ fontSize: '1.2rem' }}>Select a scan to view graphs.</div>
+          <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
+            Start a scan
+          </button>
+        </div>
+      );
+    }
+
+    if ((loading || initialLoad) && (!displayGraphData || !displayGraphData.nodes || displayGraphData.nodes.length === 0)) {
       return (
         <div style={{ 
           display: 'flex', 
@@ -219,16 +362,16 @@ function GraphsPage() {
           height: '500px',
           gap: '1rem'
         }}>
-          <div style={{ fontSize: '3rem' }}>📊</div>
+          <div style={{ fontSize: '3rem' }}>Graph error</div>
           <div style={{ fontSize: '1.2rem', color: '#666' }}>{error}</div>
           <div style={{ fontSize: '0.9rem', color: '#999' }}>
-            Graph type: {graphType} | Scan ID: {activeScanId}
+            Try switching to CPG or choose another file.
           </div>
         </div>
       );
     }
 
-    if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+    if (!displayGraphData || !displayGraphData.nodes || displayGraphData.nodes.length === 0) {
       return (
         <div style={{ 
           display: 'flex', 
@@ -238,25 +381,40 @@ function GraphsPage() {
           height: '500px',
           gap: '1rem'
         }}>
-          <div style={{ fontSize: '3rem' }}>🔍</div>
+          <div style={{ fontSize: '3rem' }}>No data</div>
           <div style={{ fontSize: '1.2rem', color: '#666' }}>No graph data available</div>
+          <div style={{ fontSize: '0.9rem', color: '#999' }}>
+            Run a scan on this file or select another file from the list.
+          </div>
         </div>
       );
     }
 
     const pathNodes = selectedVuln?.evidence?.data_flow_path || [];
-    const vulnerablePath = showDataFlow || showOnlyPath
-      ? new Set(pathNodes)
-      : new Set();
+    const vulnerablePath = new Set(pathNodes);
 
-    // Filter nodes: if showDataFlow is true, only show nodes in vulnerable path
-    let nodesToShow = graphData.nodes || [];
-    let edgesToShow = graphData.edges || [];
+    const isPathMode = showDataFlow || showOnlyPath;
+
+    // Filter nodes: only show nodes in the vulnerable path when requested
+    let nodesToShow = displayGraphData.nodes || [];
+    let edgesToShow = displayGraphData.edges || [];
     if (showOnlyPath && vulnerablePath.size > 0) {
       nodesToShow = nodesToShow.filter((node) => vulnerablePath.has(node.id));
       edgesToShow = edgesToShow.filter(
         (edge) => vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to)
       );
+    }
+
+    const nodeIndexById = new Map(nodesToShow.map((node, idx) => [node.id, idx]));
+    const pathEdges = [];
+    if (pathNodes.length > 1) {
+      for (let i = 0; i < pathNodes.length - 1; i += 1) {
+        const fromId = pathNodes[i];
+        const toId = pathNodes[i + 1];
+        if (nodeIndexById.has(fromId) && nodeIndexById.has(toId)) {
+          pathEdges.push({ from: fromId, to: toId });
+        }
+      }
     }
 
     return (
@@ -304,6 +462,10 @@ function GraphsPage() {
             const toPos = getNodePosition(nodesToShow.indexOf(toNode), nodesToShow.length);
 
             const isInPath = vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to);
+            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.2) : (isInPath ? 0.95 : 0.6);
+            const edgeStroke = isInPath ? "#ff0000" : "#334155";
+            const edgeWidth = isInPath ? 3 : 1.4;
+            const edgeMarker = isInPath && isPathMode ? "url(#arrowhead-red)" : "none";
 
             return (
               <g key={`edge-${idx}`}>
@@ -312,10 +474,10 @@ function GraphsPage() {
                   y1={fromPos.y}
                   x2={toPos.x}
                   y2={toPos.y}
-                  stroke={isInPath ? "#ff0000" : "#444"}
-                  strokeWidth={isInPath ? 3 : 1.5}
-                  markerEnd={isInPath ? "url(#arrowhead-red)" : "url(#arrowhead)"}
-                  opacity={isInPath ? 1 : 0.6}
+                  stroke={edgeStroke}
+                  strokeWidth={edgeWidth}
+                  markerEnd={edgeMarker}
+                  opacity={edgeOpacity}
                 >
                   {isInPath && (
                     <animate
@@ -330,7 +492,7 @@ function GraphsPage() {
                 <text
                   x={(fromPos.x + toPos.x) / 2}
                   y={(fromPos.y + toPos.y) / 2}
-                  fill={isInPath ? "#ff6b6b" : "#888"}
+                  fill={isInPath ? "#ff6b6b" : "#94a3b8"}
                   fontSize="9"
                   textAnchor="middle"
                 >
@@ -340,6 +502,31 @@ function GraphsPage() {
             );
           })}
         </g>
+
+        {/* Draw explicit vulnerable path arrows */}
+        {pathEdges.length > 0 && (
+          <g className="path-edges">
+            {pathEdges.map((edge, idx) => {
+              const fromIdx = nodeIndexById.get(edge.from);
+              const toIdx = nodeIndexById.get(edge.to);
+              const fromPos = getNodePosition(fromIdx, nodesToShow.length);
+              const toPos = getNodePosition(toIdx, nodesToShow.length);
+              return (
+                <line
+                  key={`path-edge-${idx}`}
+                  x1={fromPos.x}
+                  y1={fromPos.y}
+                  x2={toPos.x}
+                  y2={toPos.y}
+                  stroke="#ef4444"
+                  strokeWidth={isPathMode ? 3.5 : 2}
+                  markerEnd="url(#arrowhead-red)"
+                  opacity={isPathMode ? 0.95 : 0.7}
+                />
+              );
+            })}
+          </g>
+        )}
 
         {/* Draw nodes */}
         <g className="nodes">
@@ -451,13 +638,13 @@ function GraphsPage() {
         </g>
 
         {/* Stats */}
-        {graphData.meta && (
+        {displayGraphData.meta && (
           <g className="stats" transform="translate(605, 15)">
             <rect width="180" height="75" fill="#1a1f35" opacity="0.9" rx="5" />
             <text x="10" y="22" fill="#e5e7eb" fontSize="11" fontWeight="bold">Graph Stats</text>
-            <text x="10" y="40" fill="#9ca3af" fontSize="10">Nodes: {nodesToShow.length}/{graphData.meta.total_nodes}</text>
-            <text x="10" y="55" fill="#9ca3af" fontSize="10">Edges: {edgesToShow.length}/{graphData.meta.total_edges}</text>
-            <text x="10" y="70" fill="#9ca3af" fontSize="10">Tainted: {graphData.meta.tainted_nodes}</text>
+            <text x="10" y="40" fill="#9ca3af" fontSize="10">Nodes: {nodesToShow.length}/{displayGraphData.meta.total_nodes}</text>
+            <text x="10" y="55" fill="#9ca3af" fontSize="10">Edges: {edgesToShow.length}/{displayGraphData.meta.total_edges}</text>
+            <text x="10" y="70" fill="#9ca3af" fontSize="10">Tainted: {displayGraphData.meta.tainted_nodes}</text>
           </g>
         )}
       </svg>
@@ -485,7 +672,7 @@ function GraphsPage() {
             padding: '2px 8px', 
             borderRadius: '4px',
             color: '#60a5fa'
-          }}>{activeScanId}</code>
+          }}>{displayScanId || "-"}</code>
         </p>
       </div>
 
@@ -499,6 +686,37 @@ function GraphsPage() {
         alignItems: 'center',
         flexWrap: 'wrap'
       }}>
+        {!hasScan && displayGraphData && (
+          <div style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            padding: '0.5rem 0.75rem',
+            background: '#111827',
+            border: '1px solid #1f2937',
+            borderRadius: '8px',
+            color: '#cbd5f5',
+            fontSize: '0.85rem'
+          }}>
+            <span>Showing the last loaded graph. Select a scan to update it.</span>
+            <button
+              onClick={clearView}
+              style={{
+                padding: '0.35rem 0.75rem',
+                background: '#1f2937',
+                color: '#e5e7eb',
+                border: '1px solid #374151',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.8rem'
+              }}
+            >
+              Clear view
+            </button>
+          </div>
+        )}
         {/* Graph Type Selector */}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
           <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Graph Type:</label>
@@ -506,17 +724,17 @@ function GraphsPage() {
             <button
               key={type}
               onClick={() => setGraphType(type)}
-              disabled={showDataFlow || showOnlyPath}
+              disabled={!hasScan || showDataFlow || showOnlyPath}
               style={{
                 padding: '0.5rem 1rem',
                 background: graphType === type ? '#3b82f6' : '#1f2937',
                 color: graphType === type ? 'white' : '#9ca3af',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: showDataFlow || showOnlyPath ? 'not-allowed' : 'pointer',
+                cursor: !hasScan || showDataFlow || showOnlyPath ? 'not-allowed' : 'pointer',
                 fontSize: '0.9rem',
                 fontWeight: graphType === type ? 'bold' : 'normal',
-                opacity: showDataFlow || showOnlyPath ? 0.6 : 1
+                opacity: !hasScan || showDataFlow || showOnlyPath ? 0.6 : 1
               }}
             >
               {type}
@@ -525,7 +743,7 @@ function GraphsPage() {
         </div>
 
         {/* File Selector */}
-        {availableFiles.length > 0 && (
+        {hasScan && availableFiles.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>File:</label>
             <select
@@ -535,6 +753,7 @@ function GraphsPage() {
                 setActiveFileId(nextId);
                 navigate(`/graphs?scanId=${activeScanId}&fileId=${nextId}`, { replace: true });
               }}
+              disabled={!hasScan}
               style={{
                 padding: '0.5rem',
                 background: '#1f2937',
@@ -551,21 +770,27 @@ function GraphsPage() {
                 </option>
               ))}
             </select>
+            {activeFilePath && (
+              <span style={{ color: "#94a3b8", fontSize: "0.8rem" }} title={activeFilePath}>
+                {activeFilePath}
+              </span>
+            )}
           </div>
         )}
 
         {/* Vulnerability Selector */}
-        {visibleVulnerabilities.length > 0 && (
+        {hasScan && vulnerabilitiesForSelector.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
             <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Vulnerability:</label>
             <select
               value={selectedVuln?.id || ''}
               onChange={(e) => {
-                const vuln = visibleVulnerabilities.find(v => v.id === e.target.value);
+                const vuln = vulnerabilitiesForSelector.find(v => v.id === e.target.value);
                 setSelectedVuln(vuln);
                 setShowDataFlow(false);
                 setShowOnlyPath(false);
               }}
+              disabled={!hasScan}
               style={{
                 padding: '0.5rem',
                 background: '#1f2937',
@@ -577,9 +802,9 @@ function GraphsPage() {
                 maxWidth: '400px'
               }}
             >
-              {visibleVulnerabilities.map(vuln => (
+              {vulnerabilitiesForSelector.map(vuln => (
                 <option key={vuln.id} value={vuln.id}>
-                  {vuln.type} - {vuln.severity} (Line {vuln.location?.start_line})
+                  {vuln.type} - {vuln.severity} (Line {vuln.location?.start_line}) {vuln.location?.file ? `- ${vuln.location.file}` : ""}
                 </option>
               ))}
             </select>
@@ -635,12 +860,26 @@ function GraphsPage() {
             >
               {showOnlyPath ? 'Show Full Graph' : 'Only Path Nodes'}
             </button>
+            <button
+              onClick={resetView}
+              style={{
+                padding: '0.5rem 1rem',
+                background: '#1f2937',
+                color: '#e5e7eb',
+                border: '1px solid #374151',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              Reset view
+            </button>
           </>
         )}
       </div>
 
       {/* Vulnerability Info Banner */}
-      {selectedVuln && (showDataFlow || showOnlyPath) && (
+      {selectedVuln && (
         <div style={{
           padding: '1rem 1.5rem',
           background: '#7f1d1d',
@@ -686,8 +925,8 @@ function GraphsPage() {
           {renderGraph()}
         </div>
 
-        {/* Node Info Panel */}
-        {selectedNode && (
+        {/* Side Panel */}
+        {showSidePanel && (
           <div style={{
             flex: 1,
             background: '#020617',
@@ -695,153 +934,237 @@ function GraphsPage() {
             padding: '1.5rem',
             border: '1px solid #1f2937',
             maxHeight: '600px',
-            overflow: 'auto'
+            overflow: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '1.25rem'
           }}>
-            {/* Close button */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ margin: 0, color: '#e5e7eb', fontSize: '1.2rem' }}>Node Information</h3>
-              <button
-                onClick={() => setSelectedNode(null)}
-                style={{
-                  background: '#374151',
-                  border: 'none',
-                  borderRadius: '4px',
-                  color: '#9ca3af',
-                  cursor: 'pointer',
-                  padding: '0.25rem 0.75rem',
-                  fontSize: '1rem'
-                }}
-              >
-                ✕
-              </button>
+
+            {vulnerabilitiesForSelector.length > 0 && (
+              <div style={{
+                background: '#111827',
+                borderRadius: '8px',
+                padding: '1rem',
+                border: '1px solid #1f2937'
+              }}>
+                <div style={{ color: '#e5e7eb', fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem' }}>
+                  Vulnerabilities in file
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {vulnerabilitiesForSelector.map((vuln) => (
+                    <button
+                      key={vuln.id}
+                      onClick={() => {
+                        setSelectedVuln(vuln);
+                        setShowDataFlow(false);
+                        setShowOnlyPath(false);
+                      }}
+                      style={{
+                        textAlign: 'left',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '6px',
+                        border: selectedVuln?.id === vuln.id ? '1px solid #ef4444' : '1px solid #1f2937',
+                        background: selectedVuln?.id === vuln.id ? '#3f1d1d' : '#0f172a',
+                        color: '#e5e7eb',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem'
+                      }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{vuln.type}</div>
+                      <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
+                        {vuln.severity} • Line {vuln.location?.start_line || '-'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedNode ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h3 style={{ margin: 0, color: '#e5e7eb', fontSize: '1.2rem' }}>Node Information</h3>
+                  <button
+                    onClick={() => setSelectedNode(null)}
+                    style={{
+                      background: '#374151',
+                      border: 'none',
+                      borderRadius: '4px',
+                      color: '#9ca3af',
+                      cursor: 'pointer',
+                      padding: '0.25rem 0.75rem',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>ID</div>
+                    <div style={{
+                      color: '#e5e7eb',
+                      fontSize: '0.9rem',
+                      background: '#1f2937',
+                      padding: '0.5rem',
+                      borderRadius: '4px',
+                      wordBreak: 'break-all'
+                    }}>
+                      {selectedNode.id}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Label</div>
+                    <div style={{
+                      color: '#e5e7eb',
+                      fontSize: '1rem',
+                      fontWeight: 'bold',
+                      background: '#1f2937',
+                      padding: '0.5rem',
+                      borderRadius: '4px'
+                    }}>
+                      {selectedNode.label}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Type</div>
+                    <div style={{
+                      color: '#60a5fa',
+                      fontSize: '0.9rem',
+                      background: '#1f2937',
+                      padding: '0.5rem',
+                      borderRadius: '4px'
+                    }}>
+                      {selectedNode.type}
+                    </div>
+                  </div>
+
+                  {selectedNode.node_type && (
+                    <div>
+                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Node Type</div>
+                      <div style={{
+                        color: '#a78bfa',
+                        fontSize: '0.9rem',
+                        background: '#1f2937',
+                        padding: '0.5rem',
+                        borderRadius: '4px'
+                      }}>
+                        {selectedNode.node_type}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Tainted</div>
+                    <div style={{
+                      color: selectedNode.tainted ? '#fbbf24' : '#10b981',
+                      fontSize: '0.9rem',
+                      background: '#1f2937',
+                      padding: '0.5rem',
+                      borderRadius: '4px',
+                      fontWeight: 'bold'
+                    }}>
+                      {selectedNode.tainted ? 'YES' : 'NO'}
+                    </div>
+                  </div>
+
+                  {selectedNode.properties && (
+                    <div>
+                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Properties</div>
+                      <div style={{
+                        color: '#e5e7eb',
+                        fontSize: '0.85rem',
+                        background: '#1f2937',
+                        padding: '0.75rem',
+                        borderRadius: '4px'
+                      }}>
+                        {selectedNode.properties.file && (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <strong style={{ color: '#9ca3af' }}>File:</strong> {selectedNode.properties.file}
+                          </div>
+                        )}
+                        {selectedNode.properties.line && (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <strong style={{ color: '#9ca3af' }}>Line:</strong> {selectedNode.properties.line}
+                          </div>
+                        )}
+                        {selectedNode.properties.column && (
+                          <div style={{ marginBottom: '0.5rem' }}>
+                            <strong style={{ color: '#9ca3af' }}>Column:</strong> {selectedNode.properties.column}
+                          </div>
+                        )}
+                        {(selectedNode.properties.value !== null && selectedNode.properties.value !== undefined) && (
+                          <div>
+                            <strong style={{ color: '#9ca3af' }}>Value:</strong> {String(selectedNode.properties.value)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedVuln && selectedVuln.evidence?.data_flow_path && (
+                    <div>
+                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>In Vulnerability Path</div>
+                      <div style={{
+                        color: selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? '#ef4444' : '#6b7280',
+                        fontSize: '0.9rem',
+                        background: '#1f2937',
+                        padding: '0.5rem',
+                        borderRadius: '4px',
+                        fontWeight: 'bold'
+                      }}>
+                        {selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? 'Part of vulnerable path' : 'Not in path'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
+                Select a node to see details.
+              </div>
+            )}
+
+            <div style={{ borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#e5e7eb', fontSize: '1rem' }}>Vulnerable Path</h4>
+              {selectedVuln?.evidence?.data_flow_path?.length ? (
+                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Nodes in order:</div>
+                  <div style={{ background: '#111827', borderRadius: '6px', padding: '0.75rem' }}>
+                    {selectedVuln.evidence.data_flow_path.map((nodeId, idx) => (
+                      <div key={nodeId} style={{ color: '#e5e7eb', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                        {idx + 1}. {nodeId}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                    Flow: {selectedVuln.evidence.data_flow_path.join(" -> ")}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem' }}>
+                  No data flow path available for this vulnerability.
+                </div>
+              )}
             </div>
 
-            {/* Node details */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* ID */}
-              <div>
-                <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>ID</div>
-                <div style={{ 
-                  color: '#e5e7eb', 
-                  fontSize: '0.9rem', 
-                  background: '#1f2937', 
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  wordBreak: 'break-all'
-                }}>
-                  {selectedNode.id}
-                </div>
-              </div>
-
-              {/* Label */}
-              <div>
-                <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Label</div>
-                <div style={{ 
-                  color: '#e5e7eb', 
-                  fontSize: '1rem',
-                  fontWeight: 'bold',
-                  background: '#1f2937', 
-                  padding: '0.5rem',
-                  borderRadius: '4px'
-                }}>
-                  {selectedNode.label}
-                </div>
-              </div>
-
-              {/* Type */}
-              <div>
-                <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Type</div>
-                <div style={{ 
-                  color: '#60a5fa', 
-                  fontSize: '0.9rem',
-                  background: '#1f2937', 
-                  padding: '0.5rem',
-                  borderRadius: '4px'
-                }}>
-                  {selectedNode.type}
-                </div>
-              </div>
-
-              {/* Node Type */}
-              {selectedNode.node_type && (
-                <div>
-                  <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Node Type</div>
-                  <div style={{ 
-                    color: '#a78bfa', 
-                    fontSize: '0.9rem',
-                    background: '#1f2937', 
-                    padding: '0.5rem',
-                    borderRadius: '4px'
-                  }}>
-                    {selectedNode.node_type}
+            <div style={{ borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
+              <h4 style={{ margin: 0, color: '#e5e7eb', fontSize: '1rem' }}>Report Summary</h4>
+              {displaySummary ? (
+                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#cbd5f5', lineHeight: '1.6' }}>
+                  <div><strong>Input type:</strong> {displaySummary.input_type || "N/A"}</div>
+                  <div><strong>Files scanned:</strong> {displaySummary.files_scanned || 0}/{displaySummary.total_files || 0}</div>
+                  <div><strong>Duration:</strong> {durationLabel}</div>
+                  <div><strong>Completed:</strong> {displaySummary.completed_at ? new Date(displaySummary.completed_at).toLocaleString() : "N/A"}</div>
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <strong>Total:</strong> {summaryCounts.total} | <strong>Critical:</strong> {summaryCounts.critical} | <strong>High:</strong> {summaryCounts.high} | <strong>Medium:</strong> {summaryCounts.medium} | <strong>Low:</strong> {summaryCounts.low}
                   </div>
                 </div>
-              )}
-
-              {/* Tainted Status */}
-              <div>
-                <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Tainted</div>
-                <div style={{ 
-                  color: selectedNode.tainted ? '#fbbf24' : '#10b981', 
-                  fontSize: '0.9rem',
-                  background: '#1f2937', 
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  fontWeight: 'bold'
-                }}>
-                  {selectedNode.tainted ? '⚠️ YES' : '✓ NO'}
-                </div>
-              </div>
-
-              {/* Properties */}
-              {selectedNode.properties && (
-                <div>
-                  <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Properties</div>
-                  <div style={{ 
-                    color: '#e5e7eb', 
-                    fontSize: '0.85rem',
-                    background: '#1f2937', 
-                    padding: '0.75rem',
-                    borderRadius: '4px'
-                  }}>
-                    {selectedNode.properties.file && (
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong style={{ color: '#9ca3af' }}>File:</strong> {selectedNode.properties.file}
-                      </div>
-                    )}
-                    {selectedNode.properties.line && (
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong style={{ color: '#9ca3af' }}>Line:</strong> {selectedNode.properties.line}
-                      </div>
-                    )}
-                    {selectedNode.properties.column && (
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <strong style={{ color: '#9ca3af' }}>Column:</strong> {selectedNode.properties.column}
-                      </div>
-                    )}
-                    {selectedNode.properties.value !== null && selectedNode.properties.value !== undefined && (
-                      <div>
-                        <strong style={{ color: '#9ca3af' }}>Value:</strong> {String(selectedNode.properties.value)}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Vulnerability Path Status */}
-              {selectedVuln && selectedVuln.evidence?.data_flow_path && (
-                <div>
-                  <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>In Vulnerability Path</div>
-                  <div style={{ 
-                    color: selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? '#ef4444' : '#6b7280',
-                    fontSize: '0.9rem',
-                    background: '#1f2937', 
-                    padding: '0.5rem',
-                    borderRadius: '4px',
-                    fontWeight: 'bold'
-                  }}>
-                    {selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? '🔴 Part of Vulnerable Path' : 'Not in path'}
-                  </div>
+              ) : (
+                <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem' }}>
+                  Run or select a scan to see the report summary.
                 </div>
               )}
             </div>
