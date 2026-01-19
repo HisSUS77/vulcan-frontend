@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
-import { dashboardService, notificationService } from "../api/services";
+import { dashboardService, notificationService, scanService } from "../api/services";
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
@@ -27,7 +27,21 @@ function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       setError(null);
+      let fallbackTimer = setTimeout(() => {
+        setLoading(false);
+      }, 600);
       try {
+        const lastScanId = localStorage.getItem("lastScanId");
+        if (lastScanId) {
+          const cached = localStorage.getItem(`scan_${lastScanId}`);
+          if (cached) {
+            try {
+              setRecentScans([JSON.parse(cached)]);
+            } catch {
+              // ignore cache parsing failures
+            }
+          }
+        }
         // Fetch all data in parallel, but handle individual failures gracefully
         const results = await Promise.allSettled([
           dashboardService.getSummary(),
@@ -44,10 +58,10 @@ function DashboardPage() {
         if (results[1].status === "fulfilled") {
           setRecentScans(results[1].value.data || []);
         } else {
-          // Try sessionStorage fallback for scans
-          const lastScanId = sessionStorage.getItem("lastScanId");
+          // Try localStorage fallback for scans
+          const lastScanId = localStorage.getItem("lastScanId");
           if (lastScanId) {
-            const cached = sessionStorage.getItem(`scan_${lastScanId}`);
+            const cached = localStorage.getItem(`scan_${lastScanId}`);
             if (cached) {
               setRecentScans([JSON.parse(cached)]);
             }
@@ -70,6 +84,9 @@ function DashboardPage() {
         console.error("Failed to fetch dashboard data:", err);
         setError(err?.userMessage || "Failed to load dashboard data.");
       } finally {
+        if (fallbackTimer) {
+          clearTimeout(fallbackTimer);
+        }
         setLoading(false);
       }
     };
@@ -101,6 +118,18 @@ function DashboardPage() {
 
   const handleScanNow = () => {
     navigate("/scan");
+  };
+
+  const handleLoadScan = async (scanId) => {
+    try {
+      const summaryRes = await scanService.getSummary(scanId);
+      const summary = summaryRes.data;
+      localStorage.setItem(`scan_${scanId}`, JSON.stringify(summary));
+      localStorage.setItem("lastScanId", scanId);
+      navigate(`/graphs?scanId=${scanId}&fileId=main`);
+    } catch (err) {
+      console.error("Failed to load scan summary:", err);
+    }
   };
 
   if (loading) {
@@ -153,8 +182,8 @@ function DashboardPage() {
                   key={idx} 
                   className="v-recent-item"
                   style={{ cursor: 'pointer' }}
-                  onClick={() => navigate(`/graphs?scanId=${scan.scan_id || scan.id}&fileId=file-1`)}
-                  title="Click to view graphs"
+                  onClick={() => handleLoadScan(scan.scan_id || scan.id)}
+                  title="Click to load scan"
                 >
                   <div className="v-recent-left">
                     <span className="v-recent-icon">↗</span>
@@ -170,7 +199,7 @@ function DashboardPage() {
                     </div>
                   </div>
                   <div className="v-recent-count">
-                    {scan.vulnerabilities_count || scan.vulnerabilities_found || scan.count || 0}
+                    {scan.vulnerabilities_found ?? scan.vulnerabilities_count ?? scan.count ?? 0}
                   </div>
                 </div>
               ))
@@ -249,7 +278,14 @@ function DashboardPage() {
           <ul className="v-notifications">
             {notifications.length > 0 ? (
               notifications.slice(0, 3).map((n, i) => (
-                <li key={i}>{n.message || n.title || n}</li>
+                <li key={i}>
+                  {n.message || n.title || n}
+                  {n.created_at && (
+                    <span style={{ color: "#6b7280", marginLeft: "0.5rem", fontSize: "0.85rem" }}>
+                      {new Date(n.created_at).toLocaleTimeString()}
+                    </span>
+                  )}
+                </li>
               ))
             ) : (
               <li style={{ color: "#999" }}>No notifications</li>

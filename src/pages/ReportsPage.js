@@ -1,6 +1,6 @@
 // src/pages/ReportsPage.js
 import React, { useState, useEffect } from "react";
-import { scanService } from "../api/services";
+import { reportService, scanService } from "../api/services";
 import "../App.css";
 
 export default function ReportsPage() {
@@ -26,14 +26,14 @@ export default function ReportsPage() {
   const fetchScans = async () => {
     try {
       // Try API first
-      const res = await scanService.list();
+      const res = await reportService.list();
       let scanList = res.data || [];
       
-      // If API returns empty, try sessionStorage
+      // If API returns empty, try localStorage
       if (scanList.length === 0) {
-        const lastScanId = sessionStorage.getItem('lastScanId');
+        const lastScanId = localStorage.getItem('lastScanId');
         if (lastScanId) {
-          const cachedScan = sessionStorage.getItem(`scan_${lastScanId}`);
+          const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
           if (cachedScan) {
             scanList = [JSON.parse(cachedScan)];
           }
@@ -42,14 +42,14 @@ export default function ReportsPage() {
       
       setScans(scanList);
       if (scanList.length > 0) {
-        setSelectedScan(scanList[0].scan_id);
+        setSelectedScan(scanList[0].scan_id || scanList[0].id);
       }
     } catch (err) {
       console.error("Failed to fetch scans:", err);
-      // Fallback to sessionStorage on error
-      const lastScanId = sessionStorage.getItem('lastScanId');
+      // Fallback to localStorage on error
+      const lastScanId = localStorage.getItem('lastScanId');
       if (lastScanId) {
-        const cachedScan = sessionStorage.getItem(`scan_${lastScanId}`);
+        const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
         if (cachedScan) {
           const scanData = JSON.parse(cachedScan);
           setScans([scanData]);
@@ -71,7 +71,7 @@ export default function ReportsPage() {
         scanData = res.data || {};
       } catch (apiErr) {
         // Fallback to sessionStorage
-        const cached = sessionStorage.getItem(`scan_${scanId}`);
+        const cached = localStorage.getItem(`scan_${scanId}`);
         if (cached) {
           scanData = JSON.parse(cached);
         } else {
@@ -204,8 +204,8 @@ export default function ReportsPage() {
               const date = new Date(s.created_at).toLocaleDateString();
               const time = new Date(s.created_at).toLocaleTimeString();
               return (
-                <option key={s.scan_id} value={s.scan_id}>
-                  {s.scan_id} - {date} {time} ({s.vulnerabilities_found} vulns)
+                <option key={s.scan_id || s.id} value={s.scan_id || s.id}>
+                  {(s.scan_id || s.id)} - {date} {time} ({s.vulnerabilities_found} vulns)
                 </option>
               );
             })}

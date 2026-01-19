@@ -16,6 +16,11 @@ function ScanPage() {
   const [repository, setRepository] = useState(initialRepoId || "");
   const [repoBranches, setRepoBranches] = useState([]); // Dynamic branches
   const [branch, setBranch] = useState("main");
+  const [scanScope, setScanScope] = useState("all"); // all | selected
+  const [repoFiles, setRepoFiles] = useState([]);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [repoFilesLoading, setRepoFilesLoading] = useState(false);
+  const [repoFilesError, setRepoFilesError] = useState("");
   const [scanMode, setScanMode] = useState("deep"); // quick | deep | custom
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -26,6 +31,21 @@ function ScanPage() {
   const [currentScanId, setCurrentScanId] = useState(null);
   const [scanSummary, setScanSummary] = useState(null);
   const pollInterval = useRef(null);
+
+  useEffect(() => {
+    const savedScanId = localStorage.getItem("lastScanId");
+    if (savedScanId && !currentScanId) {
+      const cached = localStorage.getItem(`scan_${savedScanId}`);
+      if (cached) {
+        try {
+          setScanSummary(JSON.parse(cached));
+          setCurrentScanId(savedScanId);
+        } catch {
+          // ignore corrupted cache
+        }
+      }
+    }
+  }, [currentScanId]);
 
   const fetchRepositories = useCallback(async () => {
     try {
@@ -45,7 +65,9 @@ function ScanPage() {
     if (!repoId) return;
     try {
       const res = await repositoryService.getBranches(repoId);
-      const branches = res.data || ["main"];
+      const branches = Array.isArray(res.data?.branches)
+        ? res.data.branches
+        : ["main"];
       setRepoBranches(branches);
       if (branches.length > 0 && !branches.includes(branch)) {
         setBranch(branches[0]);
@@ -56,6 +78,25 @@ function ScanPage() {
     }
   }, [branch]);
 
+  const fetchRepoFiles = useCallback(async () => {
+    if (!repository || inputMode !== "repository") return;
+    setRepoFilesLoading(true);
+    setRepoFilesError("");
+    try {
+      const res = await repositoryService.getFiles(repository, branch);
+      const files = Array.isArray(res.data?.files) ? res.data.files : [];
+      setRepoFiles(files);
+      setSelectedFiles((prev) => prev.filter((path) => files.includes(path)));
+    } catch (err) {
+      console.error("Failed to fetch repository files:", err);
+      const msg = err.response?.data?.detail || "Failed to load file list.";
+      setRepoFilesError(msg);
+      setRepoFiles([]);
+    } finally {
+      setRepoFilesLoading(false);
+    }
+  }, [repository, branch, inputMode]);
+
   useEffect(() => {
     fetchRepositories();
   }, [fetchRepositories]);
@@ -65,6 +106,13 @@ function ScanPage() {
       fetchBranches(repository);
     }
   }, [repository, inputMode, fetchBranches]);
+
+  useEffect(() => {
+    setSelectedFiles([]);
+    if (scanScope === "selected" && repository && inputMode === "repository") {
+      fetchRepoFiles();
+    }
+  }, [repository, branch, scanScope, inputMode, fetchRepoFiles]);
 
   // Poll scan status when scanning
   useEffect(() => {
@@ -98,9 +146,9 @@ function ScanPage() {
               Math.round((summary?.ai_confidence || 0) * 100)
             );
             
-            // Save to sessionStorage for cross-page persistence
-            sessionStorage.setItem(`scan_${currentScanId}`, JSON.stringify(summary));
-            sessionStorage.setItem('lastScanId', currentScanId);
+            // Save to localStorage for cross-page persistence
+            localStorage.setItem(`scan_${currentScanId}`, JSON.stringify(summary));
+            localStorage.setItem("lastScanId", currentScanId);
             
             // Add vulnerabilities to logs with detailed information
             if (summary?.vulnerabilities?.length > 0) {
@@ -175,6 +223,10 @@ function ScanPage() {
         alert("Please select a repository.");
         return;
       }
+      if (scanScope === "selected" && selectedFiles.length === 0) {
+        alert("Please select at least one file to scan.");
+        return;
+      }
     }
 
     try {
@@ -194,6 +246,9 @@ function ScanPage() {
           branch: branch,
           scan_mode: scanMode.toUpperCase(),
         };
+        if (scanScope === "selected" && selectedFiles.length > 0) {
+          scanData.file_paths = selectedFiles;
+        }
       }
       
       const res = await scanService.start(scanData);
@@ -203,6 +258,7 @@ function ScanPage() {
       setLogs([]);
       setScanSummary(null);
       setToast("");
+      localStorage.setItem("lastScanId", res.data.scan_id);
     } catch (err) {
       console.error("Failed to start scan:", err);
       const errorMessage = err.response?.data?.detail 
@@ -230,6 +286,20 @@ function ScanPage() {
   const handleSaveConfig = () => {
     setToast("Scan configuration saved.");
     setTimeout(() => setToast(""), 3000);
+  };
+
+  const toggleFileSelection = (path) => {
+    setSelectedFiles((prev) =>
+      prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
+    );
+  };
+
+  const handleSelectAllFiles = () => {
+    setSelectedFiles(repoFiles);
+  };
+
+  const handleClearFiles = () => {
+    setSelectedFiles([]);
   };
 
   const handleViewGraph = () => {
@@ -326,37 +396,119 @@ function ScanPage() {
             )}
 
             {inputMode === "repository" && (
-              <div className="vs-row-top">
-                <div className="vs-field">
-                  <div className="vs-label">Repository</div>
-                  <select
-                    className="vs-select"
-                    value={repository}
-                    onChange={(e) => setRepository(e.target.value)}
-                  >
-                    <option value="">Select repository...</option>
-                    {repositories.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <div className="vs-row-top">
+                  <div className="vs-field">
+                    <div className="vs-label">Repository</div>
+                    <select
+                      className="vs-select"
+                      value={repository}
+                      onChange={(e) => setRepository(e.target.value)}
+                    >
+                      <option value="">Select repository...</option>
+                      {repositories.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="vs-field">
+                    <div className="vs-label">Branch</div>
+                    <select
+                      className="vs-select"
+                      value={branch}
+                      onChange={(e) => setBranch(e.target.value)}
+                    >
+                      {(repoBranches.length > 0 ? repoBranches : ["main"]).map((b) => (
+                        <option key={b} value={b}>
+                          {b}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <div className="vs-field">
-                  <div className="vs-label">Branch</div>
-                  <select
-                    className="vs-select"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
-                  >
-                    {(repoBranches.length > 0 ? repoBranches : ["main"]).map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
-                    ))}
-                  </select>
+                <div className="vs-row-mode" style={{ marginTop: "1rem" }}>
+                  <div className="vs-label">Scan scope</div>
+                  <div className="vs-mode-group">
+                    <button
+                      type="button"
+                      className={"vs-mode-btn" + (scanScope === "all" ? " active" : "")}
+                      onClick={() => setScanScope("all")}
+                    >
+                      Full repository
+                    </button>
+                    <button
+                      type="button"
+                      className={"vs-mode-btn" + (scanScope === "selected" ? " active" : "")}
+                      onClick={() => setScanScope("selected")}
+                    >
+                      Select files
+                    </button>
+                  </div>
                 </div>
+
+                {scanScope === "selected" && (
+                  <div className="vs-field" style={{ marginTop: "0.75rem" }}>
+                    <div className="vs-label" style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Files to scan</span>
+                      <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                        {selectedFiles.length} selected
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                      <button type="button" className="vs-save-config-btn" onClick={fetchRepoFiles}>
+                        Refresh list
+                      </button>
+                      <button type="button" className="vs-save-config-btn" onClick={handleSelectAllFiles}>
+                        Select all
+                      </button>
+                      <button type="button" className="vs-save-config-btn" onClick={handleClearFiles}>
+                        Clear
+                      </button>
+                    </div>
+                    <div
+                      style={{
+                        border: "1px solid #2b2f3a",
+                        borderRadius: "8px",
+                        padding: "0.5rem",
+                        maxHeight: "220px",
+                        overflow: "auto",
+                        background: "#0f1117",
+                      }}
+                    >
+                      {repoFilesLoading && <div style={{ color: "#999" }}>Loading files...</div>}
+                      {repoFilesError && <div style={{ color: "#f97373" }}>{repoFilesError}</div>}
+                      {!repoFilesLoading && !repoFilesError && repoFiles.length === 0 && (
+                        <div style={{ color: "#999" }}>No source files found.</div>
+                      )}
+                      {!repoFilesLoading &&
+                        !repoFilesError &&
+                        repoFiles.map((path) => (
+                          <label
+                            key={path}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "0.5rem",
+                              padding: "0.25rem 0",
+                              color: "#cbd5f5",
+                              fontSize: "0.9rem",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedFiles.includes(path)}
+                              onChange={() => toggleFileSelection(path)}
+                            />
+                            <span>{path}</span>
+                          </label>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

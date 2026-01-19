@@ -10,7 +10,7 @@ export default function PatchGeneratorPage() {
   const navigate = useNavigate();
   const scanId = searchParams.get("scanId");
   const [activeScanId, setActiveScanId] = useState(
-    scanId || sessionStorage.getItem("lastScanId") || null
+    scanId || localStorage.getItem("lastScanId") || null
   );
   //  Component State
   const [vulnerabilities, setVulnerabilities] = useState([]);
@@ -48,7 +48,7 @@ export default function PatchGeneratorPage() {
       setActiveScanId(scanId);
       return;
     }
-    const lastScanId = sessionStorage.getItem("lastScanId");
+    const lastScanId = localStorage.getItem("lastScanId");
     if (lastScanId) {
       setActiveScanId(lastScanId);
       navigate(`/patches?scanId=${lastScanId}`, { replace: true });

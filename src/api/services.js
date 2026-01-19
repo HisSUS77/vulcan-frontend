@@ -35,6 +35,8 @@ export const repositoryService = {
   get: (id) => api.get(`/repositories/${id}`),
   delete: (id) => api.delete(`/repositories/${id}`),
   getBranches: (id) => api.get(`/repositories/${id}/branches`),
+  getFiles: (id, branch = "main") =>
+    api.get(`/repositories/${id}/files`, { params: { branch } }),
   upload: (id, file) => {
     const formData = new FormData();
     formData.append("file", file);

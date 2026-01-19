@@ -1,5 +1,5 @@
 // src/pages/GraphsPage.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 import { graphService, scanService } from "../api/services";
@@ -12,17 +12,24 @@ function GraphsPage() {
   const scanId = searchParams.get("scanId");
   const fileId = searchParams.get("fileId") || "main";
   const [activeScanId, setActiveScanId] = useState(
-    scanId || sessionStorage.getItem("lastScanId") || null
+    scanId || localStorage.getItem("lastScanId") || null
   );
   
   const [graphType, setGraphType] = useState("AST");
   const [graphData, setGraphData] = useState(null);
+  const [availableFiles, setAvailableFiles] = useState([]);
+  const [activeFileId, setActiveFileId] = useState(fileId || "main");
+  const [activeFilePath, setActiveFilePath] = useState(null);
   const [vulnerabilities, setVulnerabilities] = useState([]);
   const [selectedVuln, setSelectedVuln] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [initialLoad, setInitialLoad] = useState(true);
   const [error, setError] = useState(null);
   const [showDataFlow, setShowDataFlow] = useState(false);
+  const [showOnlyPath, setShowOnlyPath] = useState(false);
+  const [lastGraphType, setLastGraphType] = useState("AST");
+  const pendingGraphKeyRef = useRef("");
 
   // Resolve scan id without forcing a redirect to /scan
   useEffect(() => {
@@ -30,7 +37,7 @@ function GraphsPage() {
       setActiveScanId(scanId);
       return;
     }
-    const lastScanId = sessionStorage.getItem("lastScanId");
+    const lastScanId = localStorage.getItem("lastScanId");
     if (lastScanId) {
       setActiveScanId(lastScanId);
       navigate(`/graphs?scanId=${lastScanId}&fileId=main`, { replace: true });
@@ -38,6 +45,23 @@ function GraphsPage() {
       setActiveScanId(null);
     }
   }, [scanId, navigate]);
+
+  useEffect(() => {
+    if (fileId && fileId !== activeFileId) {
+      setActiveFileId(fileId);
+    }
+  }, [fileId, activeFileId]);
+
+  useEffect(() => {
+    setInitialLoad(true);
+    setLoading(true);
+  }, [activeScanId, activeFileId]);
+
+  useEffect(() => {
+    setSelectedNode(null);
+    setShowDataFlow(false);
+    setShowOnlyPath(false);
+  }, [activeFileId]);
 
   // Fetch scan summary to get vulnerabilities
   useEffect(() => {
@@ -50,16 +74,20 @@ function GraphsPage() {
         setVulnerabilities(scanData.vulnerabilities || []);
         if (scanData.vulnerabilities?.length > 0) {
           setSelectedVuln(scanData.vulnerabilities[0]);
+          setShowDataFlow(false);
+          setShowOnlyPath(false);
         }
       } catch (err) {
         console.error("Failed to fetch vulnerabilities:", err);
         // Try sessionStorage fallback
-        const cached = sessionStorage.getItem(`scan_${activeScanId}`);
+        const cached = localStorage.getItem(`scan_${activeScanId}`);
         if (cached) {
           const scanData = JSON.parse(cached);
           setVulnerabilities(scanData.vulnerabilities || []);
           if (scanData.vulnerabilities?.length > 0) {
             setSelectedVuln(scanData.vulnerabilities[0]);
+            setShowDataFlow(false);
+            setShowOnlyPath(false);
           }
         }
       }
@@ -74,22 +102,73 @@ function GraphsPage() {
     
     const fetchGraph = async () => {
       try {
+        const requestKey = `${activeScanId}:${activeFileId}:${graphType}`;
+        pendingGraphKeyRef.current = requestKey;
         setLoading(true);
         setError(null);
-        const response = await graphService.getGraph(activeScanId, fileId, graphType);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        if (pendingGraphKeyRef.current !== requestKey) {
+          return;
+        }
+        const response = await graphService.getGraph(activeScanId, activeFileId, graphType);
         const data = response.data || response;
+        if (pendingGraphKeyRef.current !== requestKey) {
+          return;
+        }
         setGraphData(data);
+        const files = Array.isArray(data?.file?.available_files)
+          ? data.file.available_files
+          : [];
+        setAvailableFiles(files);
+        if (data?.file?.file_id) {
+          setActiveFileId(data.file.file_id);
+        }
+        setActiveFilePath(data?.file?.file_path || null);
+        setInitialLoad(false);
       } catch (err) {
         console.error("Failed to fetch graph:", err);
         setError("Graph generation not yet implemented in backend. Coming soon!");
         setGraphData(null);
+        setInitialLoad(false);
       } finally {
-        setLoading(false);
+        if (pendingGraphKeyRef.current === `${activeScanId}:${activeFileId}:${graphType}`) {
+          setLoading(false);
+        }
       }
     };
 
     fetchGraph();
-  }, [activeScanId, fileId, graphType]);
+  }, [activeScanId, activeFileId, graphType]);
+
+  const visibleVulnerabilities = activeFilePath
+    ? vulnerabilities.filter((vuln) => {
+        const path = vuln.location?.file || "";
+        return path === activeFilePath || path.endsWith(`/${activeFilePath}`) || path.endsWith(`\\${activeFilePath}`);
+      })
+    : vulnerabilities;
+
+  useEffect(() => {
+    if (visibleVulnerabilities.length === 0) {
+      setSelectedVuln(null);
+      return;
+    }
+    if (!selectedVuln || !visibleVulnerabilities.find((v) => v.id === selectedVuln.id)) {
+      setSelectedVuln(visibleVulnerabilities[0]);
+    }
+  }, [visibleVulnerabilities, selectedVuln]);
+
+  const enablePathView = () => {
+    if (graphType !== "CPG") {
+      setLastGraphType(graphType);
+      setGraphType("CPG");
+    }
+  };
+
+  const disablePathViewIfNeeded = (nextShowDataFlow, nextShowOnlyPath) => {
+    if (!nextShowDataFlow && !nextShowOnlyPath && graphType === "CPG") {
+      setGraphType(lastGraphType || "AST");
+    }
+  };
 
   if (!activeScanId) {
     return (
@@ -115,7 +194,7 @@ function GraphsPage() {
 
   // Render the graph visualization
   const renderGraph = () => {
-    if (loading) {
+    if ((loading || initialLoad) && (!graphData || !graphData.nodes || graphData.nodes.length === 0)) {
       return (
         <div style={{ 
           display: 'flex', 
@@ -165,18 +244,18 @@ function GraphsPage() {
       );
     }
 
-    const vulnerablePath = selectedVuln && showDataFlow 
-      ? new Set(selectedVuln.evidence?.data_flow_path || [])
+    const pathNodes = selectedVuln?.evidence?.data_flow_path || [];
+    const vulnerablePath = showDataFlow || showOnlyPath
+      ? new Set(pathNodes)
       : new Set();
 
     // Filter nodes: if showDataFlow is true, only show nodes in vulnerable path
     let nodesToShow = graphData.nodes || [];
     let edgesToShow = graphData.edges || [];
-    
-    if (showDataFlow && vulnerablePath.size > 0) {
-      nodesToShow = nodesToShow.filter(node => vulnerablePath.has(node.id));
-      edgesToShow = edgesToShow.filter(edge => 
-        vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to)
+    if (showOnlyPath && vulnerablePath.size > 0) {
+      nodesToShow = nodesToShow.filter((node) => vulnerablePath.has(node.id));
+      edgesToShow = edgesToShow.filter(
+        (edge) => vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to)
       );
     }
 
@@ -427,15 +506,17 @@ function GraphsPage() {
             <button
               key={type}
               onClick={() => setGraphType(type)}
+              disabled={showDataFlow || showOnlyPath}
               style={{
                 padding: '0.5rem 1rem',
                 background: graphType === type ? '#3b82f6' : '#1f2937',
                 color: graphType === type ? 'white' : '#9ca3af',
                 border: 'none',
                 borderRadius: '6px',
-                cursor: 'pointer',
+                cursor: showDataFlow || showOnlyPath ? 'not-allowed' : 'pointer',
                 fontSize: '0.9rem',
-                fontWeight: graphType === type ? 'bold' : 'normal'
+                fontWeight: graphType === type ? 'bold' : 'normal',
+                opacity: showDataFlow || showOnlyPath ? 0.6 : 1
               }}
             >
               {type}
@@ -443,16 +524,47 @@ function GraphsPage() {
           ))}
         </div>
 
+        {/* File Selector */}
+        {availableFiles.length > 0 && (
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>File:</label>
+            <select
+              value={activeFileId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setActiveFileId(nextId);
+                navigate(`/graphs?scanId=${activeScanId}&fileId=${nextId}`, { replace: true });
+              }}
+              style={{
+                padding: '0.5rem',
+                background: '#1f2937',
+                color: '#e5e7eb',
+                border: '1px solid #374151',
+                borderRadius: '6px',
+                fontSize: '0.9rem',
+                minWidth: '220px'
+              }}
+            >
+              {availableFiles.map((file) => (
+                <option key={file.id} value={file.id}>
+                  {file.path || file.id}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Vulnerability Selector */}
-        {vulnerabilities.length > 0 && (
+        {visibleVulnerabilities.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
             <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Vulnerability:</label>
             <select
               value={selectedVuln?.id || ''}
               onChange={(e) => {
-                const vuln = vulnerabilities.find(v => v.id === e.target.value);
+                const vuln = visibleVulnerabilities.find(v => v.id === e.target.value);
                 setSelectedVuln(vuln);
                 setShowDataFlow(false);
+                setShowOnlyPath(false);
               }}
               style={{
                 padding: '0.5rem',
@@ -465,7 +577,7 @@ function GraphsPage() {
                 maxWidth: '400px'
               }}
             >
-              {vulnerabilities.map(vuln => (
+              {visibleVulnerabilities.map(vuln => (
                 <option key={vuln.id} value={vuln.id}>
                   {vuln.type} - {vuln.severity} (Line {vuln.location?.start_line})
                 </option>
@@ -476,26 +588,59 @@ function GraphsPage() {
 
         {/* Show Data Flow Toggle */}
         {selectedVuln && selectedVuln.evidence?.data_flow_path && (
-          <button
-            onClick={() => setShowDataFlow(!showDataFlow)}
-            style={{
-              padding: '0.5rem 1rem',
-              background: showDataFlow ? '#ef4444' : '#1f2937',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-              fontWeight: showDataFlow ? 'bold' : 'normal'
-            }}
-          >
-            {showDataFlow ? '✓ Hide Data Flow' : 'Show Data Flow Path'}
-          </button>
+          <>
+            <button
+              onClick={() => {
+                const next = !showDataFlow;
+                setShowDataFlow(next);
+                if (next) {
+                  enablePathView();
+                } else {
+                  disablePathViewIfNeeded(false, showOnlyPath);
+                }
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: showDataFlow ? '#ef4444' : '#1f2937',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: showDataFlow ? 'bold' : 'normal'
+              }}
+            >
+              {showDataFlow ? 'Hide Data Flow' : 'Show Data Flow Path'}
+            </button>
+            <button
+              onClick={() => {
+                const next = !showOnlyPath;
+                setShowOnlyPath(next);
+                if (next) {
+                  enablePathView();
+                } else {
+                  disablePathViewIfNeeded(showDataFlow, false);
+                }
+              }}
+              style={{
+                padding: '0.5rem 1rem',
+                background: showOnlyPath ? '#f59e0b' : '#1f2937',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                fontWeight: showOnlyPath ? 'bold' : 'normal'
+              }}
+            >
+              {showOnlyPath ? 'Show Full Graph' : 'Only Path Nodes'}
+            </button>
+          </>
         )}
       </div>
 
       {/* Vulnerability Info Banner */}
-      {selectedVuln && showDataFlow && (
+      {selectedVuln && (showDataFlow || showOnlyPath) && (
         <div style={{
           padding: '1rem 1.5rem',
           background: '#7f1d1d',

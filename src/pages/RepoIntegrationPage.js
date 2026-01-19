@@ -20,6 +20,7 @@ function RepoIntegrationPage() {
     token: "",
   });
   const [addingRepo, setAddingRepo] = useState(false);
+  const [githubStatus, setGithubStatus] = useState("Not connected");
 
   // 📥 FUNCTION: Fetch repositories from API
   const fetchRepositories = useCallback(async () => {
@@ -45,7 +46,9 @@ function RepoIntegrationPage() {
   const fetchBranches = useCallback(async (repoId) => {
     try {
       const res = await repositoryService.getBranches(repoId);
-      const branches = res.data || ["main"];
+      const branches = Array.isArray(res.data?.branches)
+        ? res.data.branches
+        : ["main"];
       setRepoBranches((prev) => ({ ...prev, [repoId]: branches }));
     } catch (err) {
       console.error(`Failed to fetch branches for repo ${repoId}:`, err);
@@ -58,6 +61,24 @@ function RepoIntegrationPage() {
   useEffect(() => {
     fetchRepositories();
   }, [fetchRepositories]);
+
+  useEffect(() => {
+    const githubRepo = repositories.find((repo) => repo.provider === "GITHUB");
+    if (!githubRepo) {
+      setGithubStatus("Not connected");
+      return;
+    }
+    setGithubStatus("Checking...");
+    repositoryService
+      .getFiles(githubRepo.id, repoBranches[githubRepo.id]?.[0] || "main")
+      .then((res) => {
+        const files = Array.isArray(res.data?.files) ? res.data.files : [];
+        setGithubStatus(files.length > 0 ? "Connected" : "Connected");
+      })
+      .catch(() => {
+        setGithubStatus("Not connected");
+      });
+  }, [repositories, repoBranches]);
 
   // ➕ FUNCTION: Add new repository
   const handleAddRepository = async (e) => {
@@ -248,20 +269,8 @@ function RepoIntegrationPage() {
           <ProviderRow
             provider="GitHub"
             icon="/github.svg"
-            leftStatus="Connected"
-            rightStatus="Connected"
-          />
-          <ProviderRow
-            provider="GitLab"
-            icon="/gitlab.svg"
-            leftStatus="Connected"
-            rightStatus="Connected"
-          />
-          <ProviderRow
-            provider="Bitbucket"
-            icon="/bitbucket.svg"
-            leftStatus="Connected"
-            rightStatus="Connected"
+            leftStatus={githubStatus}
+            rightStatus={githubStatus}
           />
         </div>
 
