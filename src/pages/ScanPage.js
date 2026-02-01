@@ -183,7 +183,7 @@ function ScanPage() {
                 
                 return {
                   time: new Date().toLocaleTimeString(),
-                  text: `#${idx + 1} ${v.type} | ${v.evidence?.source} → ${v.evidence?.sink} | Line ${v.location.start_line} | AI: ${llmClass} | Exploit: ${exploitability}`,
+                  text: `#${idx + 1} ${v.type} | ${v.evidence?.source} -> ${v.evidence?.sink} | Line ${v.location.start_line} | AI: ${llmClass} | Exploit: ${exploitability}`,
                   severity: v.severity
                 };
               });
@@ -193,7 +193,7 @@ function ScanPage() {
             // Add completion summary log
             const summaryLog = {
               time: new Date().toLocaleTimeString(),
-              text: `✓ Scan completed: ${summary.vulnerabilities_found} vulnerabilities (${summary.by_severity?.critical || 0} critical, ${summary.by_severity?.high || 0} high) in ${summary.duration_seconds?.toFixed(2)}s`
+              text: `Scan completed: ${summary.vulnerabilities_found} vulnerabilities (${summary.by_severity?.critical || 0} critical, ${summary.by_severity?.high || 0} high) in ${summary.duration_seconds?.toFixed(2)}s`
             };
             setLogs(prev => [...prev, summaryLog]);
             
@@ -347,7 +347,7 @@ function ScanPage() {
       {resumeScanId && !scanning && (
         <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0b1220", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            Resume in-progress scan: <strong>{resumeScanId}</strong> · {resumeStatus}
+            Resume in-progress scan: <strong>{resumeScanId}</strong> - {resumeStatus}
           </div>
           <button
             type="button"
@@ -366,7 +366,7 @@ function ScanPage() {
       {!scanning && currentScanId && scanSummary && (
         <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0f172a", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            Last scan: <strong>{currentScanId}</strong> · {scanSummary.vulnerabilities_found || 0} vulns
+            Last scan: <strong>{currentScanId}</strong> - {scanSummary.vulnerabilities_found || 0} vulns
           </div>
           <button type="button" className="vs-view-graph-btn" onClick={handleViewGraph}>
             View last graph
@@ -378,7 +378,22 @@ function ScanPage() {
       <div className="vs-header">
         <div className="vs-header-left">
           <div className="vs-header-logo-circle">
-            <span className="vs-header-logo-icon">🕵️‍♂️</span>
+            <svg className="vs-header-logo-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 3l7 3v6c0 4.2-2.7 7.9-7 9-4.3-1.1-7-4.8-7-9V6l7-3z"
+                fill="none"
+                stroke="#0f172a"
+                strokeWidth="1.6"
+              />
+              <path
+                d="M9.6 12.2l1.7 1.7 3.7-3.7"
+                fill="none"
+                stroke="#0f172a"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           </div>
           <div className="vs-header-title">VULNERABILITY SCAN</div>
         </div>
@@ -610,7 +625,7 @@ function ScanPage() {
                 className="vs-start-btn"
                 onClick={handleStartScan}
               >
-                {scanning ? "SCANNING…" : "START SCAN"}
+                {scanning ? "SCANNING..." : "START SCAN"}
               </button>
             </div>
 
@@ -692,16 +707,16 @@ function ScanPage() {
                 </div>
               </div>
               <button className="vs-log-refresh-btn" type="button">
-                ⟳
+                Refresh
               </button>
             </div>
 
             {scanSummary && (
               <div className="vs-log-summary-row">
                 <span className="vs-log-dot critical"></span> {scanSummary.by_severity?.critical || 0} Critical
-                <span className="vs-log-bullet">•</span> {scanSummary.by_severity?.high || 0} High
-                <span className="vs-log-bullet">•</span> {scanSummary.by_severity?.medium || 0} Medium
-                <span className="vs-log-bullet">•</span> {scanSummary.by_severity?.low || 0} Low
+                <span className="vs-log-bullet">-</span> {scanSummary.by_severity?.high || 0} High
+                <span className="vs-log-bullet">-</span> {scanSummary.by_severity?.medium || 0} Medium
+                <span className="vs-log-bullet">-</span> {scanSummary.by_severity?.low || 0} Low
               </div>
             )}
 

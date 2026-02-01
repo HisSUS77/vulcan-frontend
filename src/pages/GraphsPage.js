@@ -34,6 +34,7 @@ function GraphsPage() {
   const [showOnlyPath, setShowOnlyPath] = useState(false);
   const [lastGraphType, setLastGraphType] = useState("AST");
   const pendingGraphKeyRef = useRef("");
+  const lastAutoFileForVulnRef = useRef(null);
 
   // Resolve scan id without forcing a redirect to /scan
   useEffect(() => {
@@ -171,9 +172,7 @@ function GraphsPage() {
           ? data.file.available_files
           : [];
         setAvailableFiles(files);
-        if (data?.file?.file_id) {
-          setActiveFileId(data.file.file_id);
-        }
+        // Avoid auto-switching file here; it can cause flicker loops.
         setActiveFilePath(data?.file?.file_path || null);
         setInitialLoad(false);
       } catch (err) {
@@ -224,9 +223,17 @@ function GraphsPage() {
         || normalizedVuln.endsWith(`/${filePath}`)
       );
     });
-    if (match && match.id && match.id !== activeFileId) {
+    if (!match || !match.id) return;
+    const lastAuto = lastAutoFileForVulnRef.current;
+    if (lastAuto?.vulnId === selectedVuln.id && lastAuto?.fileId === match.id) {
+      return;
+    }
+    // Only auto-switch if we don't already have a valid file selected.
+    const activeIsValid = availableFiles.some((f) => f.id === activeFileId);
+    if (!activeIsValid || activeFileId === "main") {
       setActiveFileId(match.id);
       navigate(`/graphs?scanId=${activeScanId}&fileId=${match.id}`, { replace: true });
+      lastAutoFileForVulnRef.current = { vulnId: selectedVuln.id, fileId: match.id };
     }
   }, [selectedVuln, availableFiles, activeFileId, activeScanId, navigate]);
 

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import "../App.css";
 import { repositoryService } from "../api/services";
 
-const PROVIDERS = ["GITHUB", "GITLAB", "BITBUCKET", "LOCAL"];
+const PROVIDERS = ["GITHUB", "LOCAL"];
 
 function RepoIntegrationPage() {
   const navigate = useNavigate();
@@ -27,7 +27,7 @@ function RepoIntegrationPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const checkedGithubRepoRef = useRef(null);
 
-  // 📥 FUNCTION: Fetch repositories from API
+  // Fetch repositories from API
   const fetchRepositories = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -62,7 +62,7 @@ function RepoIntegrationPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 📥 FUNCTION: Fetch repositories on page load
+  // Fetch repositories on page load
   useEffect(() => {
     fetchRepositories();
   }, [fetchRepositories]);
@@ -81,7 +81,7 @@ function RepoIntegrationPage() {
     setGithubStatus(githubRepo.url ? "Connected" : "Not connected");
   }, [repositories]);
 
-  // ➕ FUNCTION: Add new repository
+  // Add new repository
   const handleAddRepository = async (e) => {
     e.preventDefault();
     if (!newRepo.name.trim()) {
@@ -111,7 +111,7 @@ function RepoIntegrationPage() {
     }
   };
 
-  // ❌ FUNCTION: Delete repository by ID
+  // Delete repository by ID
   const handleDelete = async (id) => {
     if (!confirmDeleteId) {
       setConfirmDeleteId(id);
@@ -129,11 +129,11 @@ function RepoIntegrationPage() {
     }
   };
 
-  // 🔎 FUNCTION: Trigger a scan for repo
+  // Trigger a scan for repo
   const handleScanNow = (id) => {
     navigate(`/scan?repoId=${id}`);
   };
-  // 📤 FUNCTION: Upload a local ZIP/TAR source code
+  // Upload a local ZIP/TAR source code
   const handleUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -186,6 +186,9 @@ function RepoIntegrationPage() {
   return (
     <div className="ri-page">
       <h1 className="ri-heading">Repository Integration</h1>
+      <p className="ri-subheading">
+        Connect a GitHub repository or upload a local archive to scan your codebase.
+      </p>
       {pageMessage && <div className="acct-error" style={{ marginBottom: "1rem" }}>{pageMessage}</div>}
 
       <div className="ri-shell">
@@ -203,56 +206,64 @@ function RepoIntegrationPage() {
         {showAddModal && (
           <div className="ri-modal-overlay" onClick={() => setShowAddModal(false)}>
             <div className="ri-modal" onClick={(e) => e.stopPropagation()}>
-              <h2 className="ri-modal-title">Add Repository</h2>
+              <div className="ri-modal-header">
+                <h2 className="ri-modal-title">Add Repository</h2>
+                <p className="ri-modal-subtitle">Connect a GitHub repo or add a local archive.</p>
+              </div>
               <form onSubmit={handleAddRepository}>
-                <div className="ri-form-group">
-                  <label>Repository Name *</label>
-                  <input
-                    type="text"
-                    placeholder="e.g., my-project"
-                    value={newRepo.name}
-                    onChange={(e) =>
-                      setNewRepo((prev) => ({ ...prev, name: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div className="ri-form-group">
-                  <label>Provider</label>
-                  <select
-                    value={newRepo.provider}
-                    onChange={(e) =>
-                      setNewRepo((prev) => ({ ...prev, provider: e.target.value }))
-                    }
-                  >
-                    {PROVIDERS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="ri-form-group">
-                  <label>Repository URL</label>
-                  <input
-                    type="text"
-                    placeholder="https://github.com/user/repo"
-                    value={newRepo.url}
-                    onChange={(e) =>
-                      setNewRepo((prev) => ({ ...prev, url: e.target.value }))
-                    }
-                  />
-                </div>
-                <div className="ri-form-group">
-                  <label>Access Token (optional)</label>
-                  <input
-                    type="password"
-                    placeholder="Personal access token"
-                    value={newRepo.token}
-                    onChange={(e) =>
-                      setNewRepo((prev) => ({ ...prev, token: e.target.value }))
-                    }
-                  />
+                <div className="ri-form-grid">
+                  <div className="ri-form-group">
+                    <label>Repository Name *</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., my-project"
+                      value={newRepo.name}
+                      onChange={(e) =>
+                        setNewRepo((prev) => ({ ...prev, name: e.target.value }))
+                      }
+                      required
+                    />
+                  </div>
+                  <div className="ri-form-group">
+                    <label>Provider</label>
+                    <select
+                      value={newRepo.provider}
+                      onChange={(e) =>
+                        setNewRepo((prev) => ({ ...prev, provider: e.target.value }))
+                      }
+                    >
+                      {PROVIDERS.map((p) => (
+                        <option key={p} value={p}>
+                          {p}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="ri-form-group full">
+                    <label>Repository URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://github.com/user/repo"
+                      value={newRepo.url}
+                      onChange={(e) =>
+                        setNewRepo((prev) => ({ ...prev, url: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="ri-form-group full">
+                    <label>Access Token (optional)</label>
+                    <input
+                      type="password"
+                      placeholder="Personal access token"
+                      value={newRepo.token}
+                      onChange={(e) =>
+                        setNewRepo((prev) => ({ ...prev, token: e.target.value }))
+                      }
+                    />
+                    <div className="ri-form-helper">
+                      Only required for private repositories.
+                    </div>
+                  </div>
                 </div>
                 <div className="ri-modal-actions">
                   <button
@@ -275,7 +286,7 @@ function RepoIntegrationPage() {
           </div>
         )}
 
-        {/* PROVIDER LIST – pixel perfect */}
+        {/* PROVIDER LIST - pixel perfect */}
         <div className="ri-provider-stack">
           <ProviderRow
             provider="GitHub"
@@ -289,7 +300,30 @@ function RepoIntegrationPage() {
         <div className="ri-upload-card">
           <label htmlFor="file-upload" className="ri-upload-inner">
             <div className="ri-upload-icon-circle">
-              <span className="ri-upload-icon">⬇</span>
+              <svg className="ri-upload-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M12 4v11"
+                  fill="none"
+                  stroke="#cbd5f5"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M8 8l4-4 4 4"
+                  fill="none"
+                  stroke="#cbd5f5"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M5 14v4h14v-4"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
             <div className="ri-upload-text-block">
               <div className="ri-upload-title">Upload Local Source Code</div>
