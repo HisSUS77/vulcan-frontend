@@ -22,13 +22,29 @@ function DashboardPage() {
   const [recentScans, setRecentScans] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     const fetchData = async () => {
       setError(null);
+      setRefreshing(true);
       try {
+        const cachedSummary = localStorage.getItem("dashboard_summary_cache");
+        const cachedRecent = localStorage.getItem("dashboard_recent_cache");
+        if (mounted) {
+          if (cachedSummary) {
+            try { setSummary(JSON.parse(cachedSummary)); } catch {}
+          }
+          if (cachedRecent) {
+            try { setRecentScans(JSON.parse(cachedRecent)); } catch {}
+          }
+          if (cachedSummary || cachedRecent) {
+            setLoading(false);
+          }
+        }
+
         const lastScanId = localStorage.getItem("lastScanId");
         if (lastScanId) {
           const cached = localStorage.getItem(`scan_${lastScanId}`);
@@ -52,11 +68,13 @@ function DashboardPage() {
         // Handle summary
         if (mounted && results[0].status === "fulfilled") {
           setSummary(results[0].value.data);
+          localStorage.setItem("dashboard_summary_cache", JSON.stringify(results[0].value.data));
         }
         
         // Handle recent scans
         if (mounted && results[1].status === "fulfilled") {
           setRecentScans(results[1].value.data || []);
+          localStorage.setItem("dashboard_recent_cache", JSON.stringify(results[1].value.data || []));
         } else {
           // Try localStorage fallback for scans
           const lastScanId = localStorage.getItem("lastScanId");
@@ -92,6 +110,7 @@ function DashboardPage() {
       } finally {
         if (mounted) {
           setLoading(false);
+          setRefreshing(false);
         }
       }
     };
@@ -193,6 +212,11 @@ function DashboardPage() {
 
   return (
     <div className="v-dashboard">
+      <h1 className="ri-heading">Dashboard</h1>
+      <p className="ri-subheading">
+        Overview of scans, vulnerabilities, and patch performance.
+      </p>
+      {refreshing && <div className="v-refreshing">Syncing latest data…</div>}
       {/* Top row: Recent Scans + Severity */}
       <div className="v-row">
         <section className="v-card v-card-wide">

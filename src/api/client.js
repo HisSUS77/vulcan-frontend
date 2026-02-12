@@ -76,12 +76,17 @@ api.interceptors.response.use(
     }
     
     if (err?.response?.status === 401) {
-      // Only clear token and logout if it's an auth endpoint or token is actually invalid
-      const isAuthEndpoint = err.config?.url?.includes('/auth/');
+      const isAuthEndpoint = err.config?.url?.includes("/auth/");
       const hasToken = getAccessToken();
-      
-      // If we have a token and it's not an auth endpoint, don't auto-logout
-      // The endpoint might just not be implemented yet
+
+      if (typeof window !== "undefined") {
+        // Notify app to show invalid token warning if a token exists
+        if (hasToken) {
+          window.dispatchEvent(new CustomEvent("vulcan:invalid-token"));
+        }
+      }
+
+      // Only clear token and logout if it's an auth endpoint or no token exists
       if (isAuthEndpoint || !hasToken) {
         setAccessToken(null);
         if (typeof window !== "undefined") {

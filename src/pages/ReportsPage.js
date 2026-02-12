@@ -1,5 +1,5 @@
 // src/pages/ReportsPage.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { reportService, scanService } from "../api/services";
 import "../App.css";
@@ -14,119 +14,22 @@ export default function ReportsPage() {
   const [scanSummary, setScanSummary] = useState(null);
   const [filterBy, setFilterBy] = useState("Severity");
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [summary, setSummary] = useState({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
   const [selectedVuln, setSelectedVuln] = useState(null);
   const [exportMessage, setExportMessage] = useState("");
+  const [patchFilter, setPatchFilter] = useState("all");
+  const [patchSearch, setPatchSearch] = useState("");
 
-  useEffect(() => {
-    fetchScans();
-  }, []);
-
-  useEffect(() => {
-    if (selectedScan) {
-      fetchScanData(selectedScan);
-    }
-  }, [selectedScan]);
-
-  useEffect(() => {
-    if (selectedScan) {
-      localStorage.setItem("lastScanId", selectedScan);
-    }
-  }, [selectedScan]);
-
-  useEffect(() => {
-    if (!selectedScan) {
-      setScanSummary(null);
-      setVulnerabilities([]);
-      setSummary({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
-    }
-  }, [selectedScan]);
-
-  const fetchScans = async () => {
-    try {
-      // Try API first
-      const res = await reportService.list();
-      let scanList = res.data || [];
-      
-      // If API returns empty, try localStorage
-      if (scanList.length === 0) {
-        const lastScanId = localStorage.getItem('lastScanId');
-        if (lastScanId) {
-          const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
-          if (cachedScan) {
-            scanList = [JSON.parse(cachedScan)];
-          }
-        }
-      }
-      
-      setScans(scanList);
-      if (!selectedScan && scanList.length > 0) {
-        const stored = localStorage.getItem("lastScanId");
-        const match = stored && scanList.find((s) => (s.scan_id || s.id) === stored);
-        setSelectedScan(match ? (match.scan_id || match.id) : (scanList[0].scan_id || scanList[0].id));
-      }
-      if (scanList.length === 0) {
-        setSelectedScan(selectedScan || null);
-      }
-    } catch (err) {
-      console.error("Failed to fetch scans:", err);
-      // Fallback to localStorage on error
-      const lastScanId = localStorage.getItem('lastScanId');
-      if (lastScanId) {
-        const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
-        if (cachedScan) {
-          const scanData = JSON.parse(cachedScan);
-          setScans([scanData]);
-        }
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchScanData = async (scanId) => {
-    try {
-      let scanData;
-      
-      // Try API first
-      try {
-        const res = await scanService.getSummary(scanId);
-        scanData = res.data || {};
-      } catch (apiErr) {
-        // Fallback to sessionStorage
-        const cached = localStorage.getItem(`scan_${scanId}`);
-        if (cached) {
-          scanData = JSON.parse(cached);
-        } else {
-          throw apiErr;
-        }
-      }
-
-      if (!scanData?.vulnerabilities) {
-        const reportRes = await reportService.get(scanId);
-        scanData = {
-          ...(reportRes.data || {}),
-          summary: reportRes.data?.summary || {},
-          vulnerabilities: reportRes.data?.vulnerabilities || [],
-        };
-      }
-      
-      const normalizedSummary = {
-        ...(scanData.summary || scanData),
-        scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
-        status: scanData.status || scanData.summary?.status,
-        input_type: scanData.input_type || scanData.summary?.input_type,
-        files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
-        total_files: scanData.total_files || scanData.summary?.total_files,
-        duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
-        completed_at: scanData.completed_at || scanData.summary?.completed_at,
-      };
-      setScanSummary(normalizedSummary);
-      
-      // Map vulnerabilities from backend format
-      const vulns = (scanData.vulnerabilities || []).map(v => ({
+  const normalizeVulns = useCallback((rawVulns, prev = []) => {
+    const prevMap = new Map(prev.map((v) => [v.id, v]));
+    return (rawVulns || []).map((v) => {
+      const prevV = prevMap.get(v.id);
+      const patch = v.patch || prevV?.patch;
+      const patchStatus = (v.patch?.status || prevV?.patchStatus || "none");
+      return {
         id: v.id,
-        severity: v.severity.charAt(0).toUpperCase() + v.severity.slice(1),
+        severity: v.severity ? v.severity.charAt(0).toUpperCase() + v.severity.slice(1) : "Medium",
         type: v.type,
         cwe: v.cwe,
         owasp: v.owasp,
@@ -143,45 +46,181 @@ export default function ReportsPage() {
         llmRemediation: v.analysis?.llm_classification?.remediation,
         exploitability: v.analysis?.llm_classification?.exploitability,
         staticReason: v.analysis?.static_detection?.reason,
-        patchStatus: "Pending" // Will be updated from patch service
-      }));
-      
-      setVulnerabilities(vulns);
-      
-      // Calculate summary from backend data
+        patch,
+        patchStatus,
+        patchConfidence: v.patch?.confidence ?? prevV?.patchConfidence,
+        patchValidationSummary: v.patch?.validation_summary || prevV?.patchValidationSummary,
+        patchId: v.patch?.patch_id || prevV?.patchId,
+      };
+    });
+  }, []);
+
+  const applyVulnsAndSummary = useCallback((rawVulns, normalizedSummary) => {
+    setVulnerabilities((prev) => {
+      const merged = normalizeVulns(rawVulns, prev);
       const bySeverity = normalizedSummary.by_severity || {};
-      const total = normalizedSummary.vulnerabilities_found
-        | normalizedSummary.total_vulns
-        | 0;
-      const avgConfidence = vulns.length > 0 
-        ? Math.round(vulns.reduce((sum, v) => sum + v.confidence, 0) / vulns.length)
+      const total = normalizedSummary.vulnerabilities_found | normalizedSummary.total_vulns | 0;
+      const avgConfidence = merged.length > 0
+        ? Math.round(merged.reduce((sum, v) => sum + v.confidence, 0) / merged.length)
         : 0;
-      
-      setSummary({ 
+      setSummary({
         total,
         critical: bySeverity.critical || 0,
         high: bySeverity.high || 0,
         medium: bySeverity.medium || 0,
         low: bySeverity.low || 0,
-        accuracy: avgConfidence
+        accuracy: avgConfidence,
       });
+      return merged;
+    });
+  }, [normalizeVulns]);
+
+  const fetchScans = useCallback(async () => {
+    try {
+      setRefreshing(true);
+      const res = await reportService.list();
+      let scanList = res.data || [];
+
+      if (scanList.length === 0) {
+        const lastScanId = localStorage.getItem("lastScanId");
+        if (lastScanId) {
+          const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
+          if (cachedScan) {
+            scanList = [JSON.parse(cachedScan)];
+          }
+        }
+      }
+
+      setScans(scanList);
+      if (!selectedScan && scanList.length > 0) {
+        const stored = localStorage.getItem("lastScanId");
+        const match = stored && scanList.find((s) => (s.scan_id || s.id) === stored);
+        setSelectedScan(match ? (match.scan_id || match.id) : (scanList[0].scan_id || scanList[0].id));
+      }
+      if (scanList.length === 0) {
+        setSelectedScan(selectedScan || null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch scans:", err);
+      const lastScanId = localStorage.getItem("lastScanId");
+      if (lastScanId) {
+        const cachedScan = localStorage.getItem(`scan_${lastScanId}`);
+        if (cachedScan) {
+          const scanData = JSON.parse(cachedScan);
+          setScans([scanData]);
+        }
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [selectedScan]);
+
+  const fetchScanData = useCallback(async (scanId) => {
+    try {
+      const cached = localStorage.getItem(`scan_${scanId}`);
+      if (cached) {
+        try {
+          const scanData = JSON.parse(cached);
+          const normalizedSummary = {
+            ...(scanData.summary || scanData),
+            scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
+            status: scanData.status || scanData.summary?.status,
+            input_type: scanData.input_type || scanData.summary?.input_type,
+            files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
+            total_files: scanData.total_files || scanData.summary?.total_files,
+            duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
+            completed_at: scanData.completed_at || scanData.summary?.completed_at,
+          };
+          setScanSummary((prev) => ({
+            ...prev,
+            ...normalizedSummary,
+          }));
+          applyVulnsAndSummary(scanData.vulnerabilities, normalizedSummary);
+          setLoading(false);
+        } catch {}
+      }
+
+      let scanData;
+      try {
+        const res = await scanService.getSummary(scanId);
+        scanData = res.data || {};
+      } catch (apiErr) {
+        const cached = localStorage.getItem(`scan_${scanId}`);
+        if (cached) {
+          scanData = JSON.parse(cached);
+        } else {
+          throw apiErr;
+        }
+      }
+
+      if (!scanData?.vulnerabilities) {
+        const reportRes = await reportService.get(scanId);
+        scanData = {
+          ...(reportRes.data || {}),
+          summary: reportRes.data?.summary || {},
+          vulnerabilities: reportRes.data?.vulnerabilities || [],
+        };
+      }
+
+      const normalizedSummary = {
+        ...(scanData.summary || scanData),
+        scan_id: scanData.scan_id || scanData.id || scanData.summary?.scan_id,
+        status: scanData.status || scanData.summary?.status,
+        input_type: scanData.input_type || scanData.summary?.input_type,
+        files_scanned: scanData.files_scanned || scanData.summary?.files_scanned,
+        total_files: scanData.total_files || scanData.summary?.total_files,
+        duration_seconds: scanData.duration_seconds || scanData.summary?.duration_seconds,
+        completed_at: scanData.completed_at || scanData.summary?.completed_at,
+      };
+      setScanSummary((prev) => ({
+        ...prev,
+        ...normalizedSummary,
+      }));
+
+      applyVulnsAndSummary(scanData.vulnerabilities, normalizedSummary);
+      localStorage.setItem(`scan_${scanId}`, JSON.stringify(scanData));
     } catch (err) {
       console.error("Failed to fetch scan data:", err);
     }
-  };
+  }, [applyVulnsAndSummary]);
+
+  useEffect(() => {
+    fetchScans();
+  }, [fetchScans]);
+
+  useEffect(() => {
+    if (selectedScan) {
+      fetchScanData(selectedScan);
+    }
+  }, [selectedScan, fetchScanData]);
+
+  useEffect(() => {
+    if (selectedScan) {
+      localStorage.setItem("lastScanId", selectedScan);
+    }
+  }, [selectedScan]);
+
+  useEffect(() => {
+    if (!selectedScan) {
+      setScanSummary(null);
+      setVulnerabilities([]);
+      setSummary({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
+    }
+  }, [selectedScan]);
 
   const handleExportJSON = () => {
     if (!scanSummary) return;
     const dataStr = JSON.stringify(scanSummary, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+    const blob = new Blob([dataStr], { type: "application/json" });
     downloadBlob(blob, `scan-report-${selectedScan}.json`);
   };
 
   const handleExportCSV = () => {
     if (!vulnerabilities.length) return;
-    
-    const headers = ['ID', 'Type', 'Severity', 'CWE', 'OWASP', 'File', 'Lines', 'Confidence', 'Source', 'Sink'];
-    const rows = vulnerabilities.map(v => [
+
+    const headers = ["ID", "Type", "Severity", "CWE", "OWASP", "File", "Lines", "Confidence", "Source", "Sink"];
+    const rows = vulnerabilities.map((v) => [
       v.id,
       v.type,
       v.severity,
@@ -190,16 +229,16 @@ export default function ReportsPage() {
       v.file,
       v.line,
       `${v.confidence}%`,
-      v.source || '',
-      v.sink || ''
+      v.source || "",
+      v.sink || "",
     ]);
-    
+
     const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+      headers.join(","),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
     downloadBlob(blob, `scan-report-${selectedScan}.csv`);
   };
 
@@ -207,7 +246,7 @@ export default function ReportsPage() {
     if (!selectedScan) return;
     try {
       const response = await scanService.exportPDF(selectedScan);
-      const blob = response.data || response; // Handle axios response
+      const blob = response.data || response;
       downloadBlob(blob, `vulcan-scan-${selectedScan}-report.pdf`);
     } catch (err) {
       console.error("Failed to export PDF:", err);
@@ -230,17 +269,56 @@ export default function ReportsPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const patchHistory = useMemo(() => {
+    let items = vulnerabilities.filter((v) => v.patchStatus && v.patchStatus !== "none");
+    if (patchFilter !== "all") {
+      items = items.filter((v) => v.patchStatus === patchFilter);
+    }
+    if (patchSearch) {
+      const q = patchSearch.toLowerCase();
+      items = items.filter((v) =>
+        v.type?.toLowerCase().includes(q) ||
+        v.file?.toLowerCase().includes(q) ||
+        v.patchId?.toLowerCase().includes(q)
+      );
+    }
+    return items;
+  }, [vulnerabilities, patchFilter, patchSearch]);
+
   if (loading) {
-    return <div className="rv-page">Loading reports...</div>;
+    return <div className="rp6-page">Loading reports...</div>;
   }
 
   return (
-    <div className="rv-page">
-      {/* Top row: report dropdown + share/export */}
-      <div className="rv-top-row">
-        <div className="rv-report-select-wrap">
+    <div className="rp6-page">
+      <div className="rp6-hero">
+        <div>
+          <h1 className="rp6-title">Reports & Patch Insights</h1>
+          <p className="rp6-subtitle">
+            Unified vulnerability reporting with patch intelligence.
+            {refreshing && <span className="rp6-refreshing">Syncing…</span>}
+          </p>
+        </div>
+        <div className="rp6-exports">
+          <button className="rp6-btn" onClick={handleExportJSON} disabled={!vulnerabilities.length}>
+            Export JSON
+          </button>
+          <button className="rp6-btn" onClick={handleExportCSV} disabled={!vulnerabilities.length}>
+            Export CSV
+          </button>
+          <button className="rp6-btn rp6-btn-primary" onClick={handleExportPDF} disabled={!vulnerabilities.length}>
+            Export PDF
+          </button>
+        </div>
+      </div>
+
+      {exportMessage && <div className="rp6-alert">{exportMessage}</div>}
+
+      <div className="rp6-controls">
+        <div className="rp6-select-wrap">
+          <label>Selected scan</label>
           <select
-            className="rv-report-select"
+            className="rp6-select"
             value={selectedScan || ""}
             onChange={(e) => setSelectedScan(e.target.value)}
           >
@@ -256,89 +334,65 @@ export default function ReportsPage() {
             })}
           </select>
         </div>
-
-        <div className="rv-top-actions">
-          <button className="rv-top-btn" onClick={handleExportJSON} disabled={!vulnerabilities.length}>Export JSON</button>
-          <button className="rv-top-btn" onClick={handleExportCSV} disabled={!vulnerabilities.length}>Export CSV</button>
-          <button className="rv-top-btn primary" onClick={handleExportPDF} disabled={!vulnerabilities.length}>Export PDF</button>
-        </div>
-      </div>
-      {exportMessage && (
-        <div className="acct-error" style={{ marginBottom: "1rem" }}>{exportMessage}</div>
-      )}
-
-      {scanSummary ? (
-        <div style={{ marginBottom: "1rem", color: "#94a3b8", fontSize: "0.95rem" }}>
-          Input type: <strong>{scanSummary.input_type || "N/A"}</strong> | Files scanned:{" "}
-          <strong>{scanSummary.files_scanned || 0}/{scanSummary.total_files || 0}</strong>
-        </div>
-      ) : (
-        <div style={{ marginBottom: "1rem", color: "#94a3b8", fontSize: "0.95rem" }}>
-          Input type: <strong>-</strong> | Files scanned: <strong>-</strong>
-        </div>
-      )}
-
-      {/* Summary cards */}
-      <div className="rv-summary-row">
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">Total vulnerabilities</div>
-          <div className="rv-summary-value">{summary.total}</div>
-        </div>
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">Critical</div>
-          <div className="rv-summary-value rv-critical">{summary.critical}</div>
-        </div>
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">High</div>
-          <div className="rv-summary-value" style={{color: '#ff9800'}}>{summary.high}</div>
-        </div>
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">Medium</div>
-          <div className="rv-summary-value" style={{color: '#ffc107'}}>{summary.medium}</div>
-        </div>
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">Low</div>
-          <div className="rv-summary-value" style={{color: '#4caf50'}}>{summary.low}</div>
-        </div>
-        <div className="rv-summary-card">
-          <div className="rv-summary-label">Avg Confidence</div>
-          <div className="rv-summary-value rv-accuracy">{summary.accuracy}%</div>
+        <div className="rp6-scan-meta">
+          <div>
+            Input type <span>{scanSummary?.input_type || "-"}</span>
+          </div>
+          <div>
+            Files scanned <span>{scanSummary?.files_scanned || 0}/{scanSummary?.total_files || 0}</span>
+          </div>
         </div>
       </div>
 
-      {!scans.length && (
-        <div style={{ padding: "1.5rem", background: "#0f172a", borderRadius: "12px", border: "1px solid #1f2937", marginBottom: "1.5rem" }}>
-          <div style={{ color: "#e2e8f0", fontSize: "1rem", marginBottom: "0.75rem" }}>No report yet.</div>
-          <button className="rv-top-btn primary" onClick={() => navigate("/scan")}>
-            Run a scan
-          </button>
+      <div className="rp6-summary">
+        <div className="rp6-card">
+          <div className="rp6-label">Total</div>
+          <div className="rp6-value">{summary.total}</div>
+        </div>
+        <div className="rp6-card">
+          <div className="rp6-label">Critical</div>
+          <div className="rp6-value rp6-critical">{summary.critical}</div>
+        </div>
+        <div className="rp6-card">
+          <div className="rp6-label">High</div>
+          <div className="rp6-value rp6-high">{summary.high}</div>
+        </div>
+        <div className="rp6-card">
+          <div className="rp6-label">Medium</div>
+          <div className="rp6-value rp6-medium">{summary.medium}</div>
+        </div>
+        <div className="rp6-card">
+          <div className="rp6-label">Low</div>
+          <div className="rp6-value rp6-low">{summary.low}</div>
+        </div>
+        <div className="rp6-card">
+          <div className="rp6-label">Avg Confidence</div>
+          <div className="rp6-value rp6-accuracy">{summary.accuracy}%</div>
+        </div>
+      </div>
+
+      {!loading && !refreshing && scans.length === 0 && (
+        <div className="rp6-empty">
+          <div>No report yet.</div>
+          <button className="rp6-btn rp6-btn-primary" onClick={() => navigate("/scan")}>Run a scan</button>
         </div>
       )}
 
-      {/* Main content row */}
-      <div className="rv-main">
-        {/* Table side */}
-        <div className="rv-table-card">
-          <div className="rv-table-header">
-            <div className="rv-table-title-row">
-              <span className="rv-table-title">Vulnerabilities</span>
-            </div>
-            <div className="rv-filter-wrap">
-              <span className="rv-filter-label">Filter by</span>
-              <select
-                className="rv-filter-select"
-                value={filterBy}
-                onChange={(e) => setFilterBy(e.target.value)}
-              >
+      <div className="rp6-grid">
+        <div className="rp6-panel">
+          <div className="rp6-panel-header">
+            <div className="rp6-panel-title">Vulnerabilities</div>
+            <div className="rp6-filter">
+              <span>Filter</span>
+              <select className="rp6-select" value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
                 <option value="Severity">Severity</option>
                 <option value="Status">Status</option>
                 <option value="CWE">CWE</option>
               </select>
             </div>
           </div>
-
-          <div className="rv-table-scroll">
-            <table className="rv-table">
+          <div className="rp6-table-wrap">
+            <table className="rp6-table">
               <thead>
                 <tr>
                   <th>Type</th>
@@ -348,65 +402,42 @@ export default function ReportsPage() {
                   <th>File</th>
                   <th>Lines</th>
                   <th>Confidence</th>
-                  <th>Actions</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {!selectedScan ? (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5 }}>
-                      Select a scan to view its report.
-                    </td>
+                    <td colSpan="8" className="rp6-empty-row">Select a scan to view its report.</td>
                   </tr>
                 ) : vulnerabilities.length > 0 ? (
                   vulnerabilities.map((row) => (
                     <tr
                       key={row.id}
                       onClick={() => setSelectedVuln(selectedVuln?.id === row.id ? null : row)}
-                      style={{
-                        cursor: 'pointer',
-                        backgroundColor: selectedVuln?.id === row.id ? '#f0f7ff' : 'transparent'
-                      }}
+                      className={selectedVuln?.id === row.id ? "rp6-row-active" : ""}
                     >
-                      <td title={row.type}>
-                        {row.type}
-                      </td>
+                      <td title={row.type}>{row.type}</td>
                       <td>
-                        <span
-                          className={
-                            "rv-tag rv-tag-sev " +
-                            (row.severity || "medium").toLowerCase()
-                          }
-                        >
+                        <span className={`rp6-pill rp6-sev ${row.severity.toLowerCase()}`}>
                           {row.severity}
                         </span>
                       </td>
-                      <td className="rv-mono">{row.cwe}</td>
-                      <td className="rv-mono">{row.owasp}</td>
-                      <td className="rv-mono" title={row.file}>
-                        {row.file}
-                      </td>
-                      <td className="rv-mono">{row.line}</td>
+                      <td className="rp6-mono">{row.cwe}</td>
+                      <td className="rp6-mono">{row.owasp}</td>
+                      <td className="rp6-mono" title={row.file}>{row.file}</td>
+                      <td className="rp6-mono">{row.line}</td>
                       <td>{row.confidence}%</td>
                       <td>
-                        <button
-                          className="rv-tag rv-tag-status pending"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedVuln(selectedVuln?.id === row.id ? null : row);
-                          }}
-                          style={{ cursor: 'pointer', border: 'none', padding: '4px 8px' }}
-                        >
-                          {selectedVuln?.id === row.id ? 'Hide Details' : 'View Details'}
+                        <button className="rp6-pill rp6-pill-btn">
+                          {selectedVuln?.id === row.id ? "Hide" : "Details"}
                         </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" style={{ textAlign: 'center', padding: '2rem', opacity: 0.5 }}>
-                      No vulnerabilities found in this scan
-                    </td>
+                    <td colSpan="8" className="rp6-empty-row">No vulnerabilities found in this scan</td>
                   </tr>
                 )}
               </tbody>
@@ -414,204 +445,101 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* Right-side panels */}
-        <div className="rv-side">
-          <div className="rv-side-card">
-            <div className="rv-side-title">Scan Info</div>
+        <div className="rp6-side">
+          <div className="rp6-panel">
+            <div className="rp6-panel-title">Scan Info</div>
             {scanSummary ? (
-              <div style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>
-                <p><b>Scan ID:</b> {scanSummary.scan_id}</p>
-                <p><b>Status:</b> {scanSummary.status}</p>
-                <p><b>Input Type:</b> {scanSummary.input_type}</p>
-                <p><b>Files Scanned:</b> {scanSummary.files_scanned} / {scanSummary.total_files}</p>
-                <p><b>Duration:</b> {scanSummary.duration_seconds?.toFixed(2)}s</p>
-                <p><b>Completed:</b> {scanSummary.completed_at ? new Date(scanSummary.completed_at).toLocaleString() : "N/A"}</p>
+              <div className="rp6-scan-info">
+                <div><span>Scan ID</span>{scanSummary.scan_id}</div>
+                <div><span>Status</span>{scanSummary.status}</div>
+                <div><span>Input Type</span>{scanSummary.input_type}</div>
+                <div><span>Files</span>{scanSummary.files_scanned} / {scanSummary.total_files}</div>
+                <div><span>Duration</span>{scanSummary.duration_seconds?.toFixed(2)}s</div>
+                <div><span>Completed</span>{scanSummary.completed_at ? new Date(scanSummary.completed_at).toLocaleString() : "N/A"}</div>
               </div>
             ) : (
-              <div style={{ fontSize: '0.9rem', lineHeight: '1.6', color: '#94a3b8' }}>
-                Select a scan to see details.
-              </div>
+              <div className="rp6-muted">Select a scan to see details.</div>
             )}
           </div>
 
-          <div className="rv-side-card">
-            <div className="rv-side-title">Compliant with</div>
-            <div className="rv-compliance-pill">
-              <span className="rv-compliance-dot" />
-              OWASP Top 10 / CWE / SANS 25
+          <div className="rp6-panel">
+            <div className="rp6-panel-title">Patch History</div>
+            <div className="rp6-patch-controls">
+              <input
+                className="rp6-input"
+                placeholder="Search by type, file, patch id"
+                value={patchSearch}
+                onChange={(e) => setPatchSearch(e.target.value)}
+              />
+              <select className="rp6-select" value={patchFilter} onChange={(e) => setPatchFilter(e.target.value)}>
+                <option value="all">All</option>
+                <option value="generated">Generated</option>
+                <option value="validated">Validated</option>
+                <option value="rejected">Rejected</option>
+                <option value="applied_pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="applied">Applied</option>
+              </select>
             </div>
+            <div className="rp6-patch-list">
+              {patchHistory.length === 0 ? (
+                <div className="rp6-muted">No patches available for this scan.</div>
+              ) : (
+                patchHistory.map((p) => (
+                  <div key={p.id} className="rp6-patch-item">
+                    <div>
+                      <div className="rp6-patch-title">{p.type}</div>
+                      <div className="rp6-patch-sub">{p.file}</div>
+                    </div>
+                    <div className="rp6-patch-meta">
+                      <span className={`rp6-pill rp6-status ${p.patchStatus}`}>{p.patchStatus}</span>
+                      <span className="rp6-mono">{p.patchId || "-"}</span>
+                    </div>
+                    {p.patchValidationSummary && (
+                      <div className="rp6-patch-foot">{p.patchValidationSummary}</div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="rp6-panel">
+            <div className="rp6-panel-title">Compliance</div>
+            <div className="rp6-compliance">OWASP Top 10 / CWE / SANS 25</div>
           </div>
         </div>
       </div>
 
-      {/* Full-width Vulnerability Details Section Below */}
       {selectedVuln && (
-        <div style={{ 
-          marginTop: '1.5rem', 
-          background: 'white', 
-          borderRadius: '8px', 
-          padding: '2rem',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          maxWidth: '100%',
-          overflow: 'hidden'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h2 style={{ margin: 0, fontSize: '1.5rem', color: '#333' }}>Vulnerability Details</h2>
-            <button 
-              onClick={() => setSelectedVuln(null)}
-              style={{ 
-                background: '#ff4444', 
-                color: 'white',
-                border: 'none', 
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '1rem',
-                padding: '8px 20px',
-                fontWeight: 'bold'
-              }}
-            >
-              ✕ Close
-            </button>
-          </div>
-          
-          {/* Horizontal Two-Column Layout */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', overflow: 'hidden' }}>
-            {/* Left Column */}
-            <div style={{ minWidth: 0 }}>
-              {/* Header Section */}
-              <div style={{ background: '#f5f5f5', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
-                <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.3rem', color: '#333', wordWrap: 'break-word' }}>{selectedVuln.type}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <span className={`rv-tag rv-tag-sev ${selectedVuln.severity.toLowerCase()}`} style={{ fontSize: '0.85rem', padding: '6px 12px' }}>
-                    {selectedVuln.severity}
-                  </span>
-                  {selectedVuln.llmClassification && (
-                    <span style={{ 
-                      padding: '6px 14px', 
-                      borderRadius: '4px', 
-                      fontSize: '0.85rem',
-                      background: selectedVuln.llmClassification === 'VULNERABLE' ? '#ff4444' : '#ff9800',
-                      color: 'white',
-                      fontWeight: 'bold'
-                    }}>
-                      AI: {selectedVuln.llmClassification}
-                    </span>
-                  )}
-                  {selectedVuln.exploitability !== undefined && (
-                    <span style={{ 
-                      padding: '6px 14px', 
-                      borderRadius: '4px', 
-                      fontSize: '0.85rem',
-                      background: '#9c27b0',
-                      color: 'white',
-                      fontWeight: 'bold'
-                    }}>
-                      Exploitability: {Math.round(selectedVuln.exploitability * 100)}%
-                    </span>
-                  )}
-                  <span style={{ 
-                    padding: '6px 14px', 
-                    borderRadius: '4px', 
-                    fontSize: '0.85rem',
-                    background: '#2196f3',
-                    color: 'white',
-                    fontWeight: 'bold'
-                  }}>
-                    Confidence: {selectedVuln.confidence}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Metadata */}
-              <div style={{ marginBottom: '1.5rem', background: '#fafafa', padding: '1rem', borderRadius: '6px', overflow: 'hidden' }}>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
-                  <b>ID:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.id}</code>
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b>CWE:</b> {selectedVuln.cwe} &nbsp;|&nbsp; <b>OWASP:</b> {selectedVuln.owasp}
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
-                  <b>File:</b> <code style={{ background: '#e0e0e0', padding: '3px 8px', borderRadius: '4px', fontSize: '0.9rem', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.file}</code>
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333' }}>
-                  <b>Lines:</b> {selectedVuln.line}
-                </p>
-              </div>
-
-              {/* Data Flow */}
-              <div style={{ background: '#fff3cd', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #ffc107', overflow: 'hidden' }}>
-                <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#856404', fontSize: '1.1rem' }}>
-                  🔍 Data Flow Analysis
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
-                  <b style={{ color: '#000' }}>Source:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.source}</code>
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
-                  <b style={{ color: '#000' }}>Sink:</b> <code style={{ background: '#fff', padding: '3px 8px', borderRadius: '4px', color: '#000', wordBreak: 'break-all' }}>{selectedVuln.sink}</code>
-                </p>
-                <p style={{ margin: '0.5rem 0', fontSize: '0.95rem', color: '#333', wordWrap: 'break-word' }}>
-                  <b style={{ color: '#000' }}>Pattern:</b> {selectedVuln.pattern}
-                </p>
-              </div>
-
-              {/* Static Analysis */}
-              {selectedVuln.staticReason && (
-                <div style={{ background: '#e3f2fd', padding: '1.2rem', borderRadius: '8px', border: '2px solid #2196f3', overflow: 'hidden' }}>
-                  <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#0d47a1', fontSize: '1.1rem' }}>
-                    ⚡ Static Detection
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#1565c0', lineHeight: '1.7', wordWrap: 'break-word' }}>
-                    {selectedVuln.staticReason}
-                  </p>
-                </div>
-              )}
+        <div className="rp6-detail">
+          <div className="rp6-detail-header">
+            <div>
+              <div className="rp6-detail-title">{selectedVuln.type}</div>
+              <div className="rp6-detail-sub">{selectedVuln.file} � {selectedVuln.line}</div>
             </div>
-
-            {/* Right Column */}
-            <div style={{ minWidth: 0, overflow: 'hidden' }}>
-              {/* Code Snippet */}
-              {selectedVuln.codeSnippet && (
-                <div style={{ marginBottom: '1.5rem', overflow: 'hidden' }}>
-                  <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', fontSize: '1.1rem' }}>📄 Vulnerable Code:</p>
-                  <pre style={{ 
-                    background: '#1e1e1e', 
-                    padding: '1.5rem', 
-                    borderRadius: '8px',
-                    overflow: 'auto',
-                    fontSize: '0.85rem',
-                    color: '#d4d4d4',
-                    lineHeight: '1.6',
-                    border: '3px solid #ff4444',
-                    maxHeight: '300px',
-                    maxWidth: '100%',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word'
-                  }}>{selectedVuln.codeSnippet}</pre>
-                </div>
-              )}
-
-              {/* LLM Explanation */}
-              {selectedVuln.llmExplanation && (
-                <div style={{ background: '#f3e5f5', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem', border: '2px solid #9c27b0', overflow: 'hidden' }}>
-                  <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#6a1b9a', fontSize: '1.1rem' }}>
-                    🤖 AI Analysis
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#7b1fa2', lineHeight: '1.8', wordWrap: 'break-word' }}>
-                    {selectedVuln.llmExplanation}
-                  </p>
-                </div>
-              )}
-
-              {/* Remediation */}
+            <button className="rp6-btn" onClick={() => setSelectedVuln(null)}>Close</button>
+          </div>
+          <div className="rp6-detail-grid">
+            <div className="rp6-detail-card">
+              <div className="rp6-detail-label">Data Flow</div>
+              <div className="rp6-detail-row"><span>Source</span>{selectedVuln.source}</div>
+              <div className="rp6-detail-row"><span>Sink</span>{selectedVuln.sink}</div>
+              <div className="rp6-detail-row"><span>Pattern</span>{selectedVuln.pattern}</div>
+            </div>
+            <div className="rp6-detail-card">
+              <div className="rp6-detail-label">Static Detection</div>
+              <p className="rp6-detail-text">{selectedVuln.staticReason || "No static reason available."}</p>
+            </div>
+            <div className="rp6-detail-card rp6-detail-code">
+              <div className="rp6-detail-label">Vulnerable Code</div>
+              <pre>{selectedVuln.codeSnippet || "No code snippet available."}</pre>
+            </div>
+            <div className="rp6-detail-card">
+              <div className="rp6-detail-label">AI Analysis</div>
+              <p className="rp6-detail-text">{selectedVuln.llmExplanation || "No AI explanation available."}</p>
               {selectedVuln.llmRemediation && (
-                <div style={{ background: '#e8f5e9', padding: '1.2rem', borderRadius: '8px', border: '2px solid #4caf50', overflow: 'hidden' }}>
-                  <p style={{ margin: '0 0 0.8rem 0', fontWeight: 'bold', color: '#2e7d32', fontSize: '1.1rem' }}>
-                    ✅ Recommended Fix
-                  </p>
-                  <p style={{ margin: 0, fontSize: '0.95rem', color: '#388e3c', lineHeight: '1.8', wordWrap: 'break-word' }}>
-                    {selectedVuln.llmRemediation}
-                  </p>
-                </div>
+                <div className="rp6-detail-remediation">{selectedVuln.llmRemediation}</div>
               )}
             </div>
           </div>
@@ -620,4 +548,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-

@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 import { authService } from "../../api/services";
-import { getCurrentUser, setCurrentUser, setAccessToken } from "../../api/client";
+import { getAccessToken, getCurrentUser, setCurrentUser, setAccessToken } from "../../api/client";
 
 // ==== MODERN ICONS (Lucide) ====
 import {
@@ -27,7 +27,6 @@ const navItems = [
   { label: "Users", to: "/admin/users", icon: <Users size={20} />, roles: ["admin"] },
 ];
 
-const sampleRepos = ["frontend-app", "backend-service", "utility-lib"];
 
 function AppLayout({ children }) {
   const location = useLocation();
@@ -37,8 +36,10 @@ function AppLayout({ children }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [user, setUser] = useState(getCurrentUser());
+  const [invalidToken, setInvalidToken] = useState(false);
   const profileRef = useRef(null);
 
+  const sampleRepos = ["frontend-app", "backend-service", "utility-lib"];
   const suggestions =
     search.length >= 3
       ? sampleRepos.filter((r) =>
@@ -64,10 +65,12 @@ function AppLayout({ children }) {
         if (!mounted) return;
         setUser(res.data);
         setCurrentUser(res.data);
+        setInvalidToken(false);
       } catch {
         if (!mounted) return;
         setUser(null);
         setCurrentUser(null);
+        setInvalidToken(!!getAccessToken());
       }
     };
     if (!user) {
@@ -78,14 +81,46 @@ function AppLayout({ children }) {
     };
   }, [user]);
 
+  useEffect(() => {
+    const handler = () => setInvalidToken(true);
+    window.addEventListener("vulcan:invalid-token", handler);
+    return () => window.removeEventListener("vulcan:invalid-token", handler);
+  }, []);
+
+  const handleRetryToken = async () => {
+    try {
+      const res = await authService.me();
+      setUser(res.data);
+      setCurrentUser(res.data);
+      setInvalidToken(false);
+    } catch {
+      setInvalidToken(true);
+    }
+  };
+
   const handleLogout = () => {
     setAccessToken(null);
     setCurrentUser(null);
     navigate("/login", { replace: true });
   };
 
+
   return (
     <div className="v-layout">
+      {invalidToken && (
+        <div className="v-invalid-token-overlay" role="alert" aria-live="assertive">
+          <div className="v-invalid-token-card">
+            <div className="v-invalid-token-icon">⚠</div>
+            <div className="v-invalid-token-title">Invalid token</div>
+            <div className="v-invalid-token-subtitle">
+              Your session token is invalid or expired. Please retry.
+            </div>
+            <button type="button" className="v-invalid-token-btn" onClick={handleRetryToken}>
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Sidebar */}
       <aside className="v-sidebar">
@@ -117,8 +152,6 @@ function AppLayout({ children }) {
       {/* Main */}
       <div className="v-main">
         <header className="v-topbar">
-          <h1 className="v-topbar-title">Dashboard</h1>
-
           <div className="v-topbar-right">
 
             {/* Search */}

@@ -77,13 +77,13 @@ export const graphService = {
 
 // ============= PATCHES =============
 export const patchService = {
-  getVulnerabilities: (scanId) =>
-    api.get(`/patches/${scanId}/vulnerabilities`),
   generate: (data) => api.post("/patches/generate", data),
-  get: (patchId) => api.get(`/patches/${patchId}`),
-  apply: (patchId) => api.post(`/patches/${patchId}/apply`),
-  export: (patchId) => api.post(`/patches/${patchId}/export`),
-  regenerate: (patchId) => api.post(`/patches/${patchId}/regenerate`),
+  validate: (patchId) => api.post(`/patches/${patchId}/validate`),
+  apply: (patchId, repoId = null) =>
+    api.post(`/patches/${patchId}/apply`, null, {
+      params: repoId ? { repo_id: repoId } : {},
+    }),
+  export: (patchId) => api.get(`/patches/${patchId}/export`),
 };
 
 // ============= REPORTS =============

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { patchService } from "../api/services";
+import { patchService, reportService } from "../api/services";
 
 export default function PatchGeneratorPage() {
   //  Extract Query Params
@@ -20,6 +20,43 @@ export default function PatchGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState("");
 
+  const buildDiffRows = (diffText) => {
+    const lines = (diffText || "").split("\n");
+    const left = [];
+    const right = [];
+    let lno = 1;
+    let rno = 1;
+    lines.forEach((line) => {
+      if (line.startsWith("---") || line.startsWith("+++") || line.startsWith("@@")) {
+        return;
+      }
+      if (line.startsWith("-")) {
+        left.push({ no: lno++, text: line.slice(1), type: "removed" });
+        right.push({ no: "", text: "", type: "removed" });
+        return;
+      }
+      if (line.startsWith("+")) {
+        left.push({ no: "", text: "", type: "added" });
+        right.push({ no: rno++, text: line.slice(1), type: "added" });
+        return;
+      }
+      left.push({ no: lno++, text: line.replace(/^ /, ""), type: "context" });
+      right.push({ no: rno++, text: line.replace(/^ /, ""), type: "context" });
+    });
+    return { left, right };
+  };
+
+  const diffRows = buildDiffRows(selectedPatch?.unified_diff || "");
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text || "");
+      setToast("Copied to clipboard");
+    } catch (err) {
+      setToast("Copy failed");
+    }
+  };
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 2500);
@@ -30,9 +67,8 @@ export default function PatchGeneratorPage() {
   const fetchVulnerabilities = useCallback(async () => {
     if (!activeScanId) return;
     try {
-      // Call backend to get vulnerability list
-      const res = await patchService.getVulnerabilities(activeScanId);
-      const vulns = res.data || [];
+      const res = await reportService.get(activeScanId);
+      const vulns = res.data?.vulnerabilities || [];
       setVulnerabilities(vulns);
       if (vulns.length > 0) setSelectedVuln(vulns[0].id);
     } catch (err) {
@@ -101,8 +137,8 @@ export default function PatchGeneratorPage() {
   const handleApplyPatch = async () => {
     if (!selectedPatch) return;
     try {
-      await patchService.apply(selectedPatch.id);
-      setToast("Patch applied successfully!");
+      const res = await patchService.apply(selectedPatch.patch_id);
+      setToast(res?.data?.instructions || "Patch marked for apply.");
     } catch (err) {
       console.error("Failed to apply patch:", err);
       setToast("Failed to apply patch.");
@@ -113,7 +149,7 @@ export default function PatchGeneratorPage() {
   const handleExportPatch = async () => {
     if (!selectedPatch) return;
     try {
-      const res = await patchService.export(selectedPatch.id);
+      const res = await patchService.export(selectedPatch.patch_id);
       // Create and download a text file containing patch content
       const blob = new Blob([res.data.content], { type: "text/plain" });
       const url = URL.createObjectURL(blob);
@@ -126,57 +162,57 @@ export default function PatchGeneratorPage() {
       setToast("Failed to export patch.");
     }
   };
-  // 🔄 FUNCTION: Re-generate Patch with AI Again
-  const handleRegeneratePatch = async () => {
+  // ✅ FUNCTION: Validate Patch
+  const handleValidatePatch = async () => {
     if (!selectedPatch) return;
     try {
-      const res = await patchService.regenerate(selectedPatch.id);
-      setSelectedPatch(res.data);
-      setToast("Patch regenerated!");
+      const res = await patchService.validate(selectedPatch.patch_id);
+      const updated = { ...selectedPatch, ...res.data };
+      setSelectedPatch(updated);
+      setPatches((prev) =>
+        prev.map((p) => (p.patch_id === updated.patch_id ? updated : p))
+      );
+      setToast("Patch validated.");
     } catch (err) {
-      console.error("Failed to regenerate patch:", err);
-      setToast("Failed to regenerate patch.");
+      console.error("Failed to validate patch:", err);
+      setToast("Failed to validate patch.");
     }
   };
 
   return (
-    <div className="pg-wrapper">
-      {toast && <div className="vs-toast">{toast}</div>}
+    <div className="pg6-page">
+      {toast && <div className="pg6-toast">{toast}</div>}
 
-      {/* Page Heading */}
-      <div className="pg-heading-row">
-        <div>
-          <h1 className="pg-title">AI-Based Patch Generation</h1>
-          <span style={{
-            fontSize: '0.9rem',
-            color: '#666',
-            background: '#f0f0f0',
-            padding: '4px 12px',
-            borderRadius: '4px',
-            fontFamily: 'monospace',
-            display: 'inline-block',
-            marginTop: '0.5rem'
-          }}>
-            Scan ID: {activeScanId}
-          </span>
+      <div className="pg6-hero">
+        <div className="pg6-hero-left">
+          <h1 className="pg6-title">Automated Patch Generation</h1>
+          <p className="pg6-subtitle">
+            Generate verified patches with diff-only output, validation signals,
+            and apply-ready metadata.
+          </p>
+          <div className="pg6-scan-pill">
+            Scan ID <span>{activeScanId}</span>
+          </div>
         </div>
-        <button
-          className="pg-generate-btn"
-          onClick={handleGeneratePatch}
-          disabled={loading || !selectedVuln}
-        >
-          {loading ? "Generating..." : "Generate Patch"}
-        </button>
+        <div className="pg6-hero-right">
+          <button
+            className="pg6-primary"
+            onClick={handleGeneratePatch}
+            disabled={loading || !selectedVuln}
+          >
+            {loading ? "Generating..." : "Generate Patch"}
+          </button>
+          <div className="pg6-primary-hint">Diff-only output, no repo edits.</div>
+        </div>
       </div>
 
-      {/* Main Card */}
-      <div className="pg-card">
-        {/* Dropdown Row */}
-        <div className="pg-dropdown-row">
-          <div className="pg-dropdown-group">
+      <div className="pg6-grid">
+        <div className="pg6-panel pg6-panel-controls">
+          <div className="pg6-panel-title">Inputs</div>
+          <div className="pg6-field">
             <label>Select vulnerability</label>
             <select
-              className="pg-select"
+              className="pg6-select"
               value={selectedVuln}
               onChange={(e) => setSelectedVuln(e.target.value)}
             >
@@ -188,20 +224,20 @@ export default function PatchGeneratorPage() {
             </select>
           </div>
 
-          <div className="pg-dropdown-group">
-            <label>AI-generated patch</label>
+          <div className="pg6-field">
+            <label>Generated patches</label>
             <select
-              className="pg-select"
-              value={selectedPatch?.id || ""}
+              className="pg6-select"
+              value={selectedPatch?.patch_id || ""}
               onChange={(e) => {
-                const p = patches.find((x) => x.id === e.target.value);
+                const p = patches.find((x) => x.patch_id === e.target.value);
                 setSelectedPatch(p);
               }}
             >
               {patches.length > 0 ? (
                 patches.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    Patch {p.id}
+                  <option key={p.patch_id} value={p.patch_id}>
+                    Patch {p.patch_id}
                   </option>
                 ))
               ) : (
@@ -209,99 +245,168 @@ export default function PatchGeneratorPage() {
               )}
             </select>
           </div>
+
+          <div className="pg6-actions">
+            <button
+              className="pg6-secondary"
+              onClick={handleValidatePatch}
+              disabled={!selectedPatch}
+            >
+              Validate
+            </button>
+            <button
+              className="pg6-secondary"
+              onClick={handleExportPatch}
+              disabled={!selectedPatch}
+            >
+              Export Patch
+            </button>
+            <button
+              className="pg6-secondary"
+              onClick={handleApplyPatch}
+              disabled={!selectedPatch}
+            >
+              Apply Patch
+            </button>
+          </div>
+
+          <div className="pg6-status-card">
+            <div className="pg6-status-label">Patch status</div>
+            <div className="pg6-status-value">
+              {selectedPatch?.status || "n/a"}
+            </div>
+            {selectedPatch?.validations && (
+              <div className="pg6-status-meta">
+                {selectedPatch.validations.filter((v) => v.passed).length}/
+                {selectedPatch.validations.length} checks passed
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Code Compare Row */}
-        <div className="pg-code-compare">
-          {/* Original Code */}
-          <div className="pg-code-box">
-            <pre className="pg-code">
-              {selectedPatch?.original_code || "No patch selected"}
-            </pre>
-            <div className="pg-diff-red"></div>
-          </div>
-
-          {/* Patched Code */}
-          <div className="pg-code-box">
-            <pre className="pg-code pg-green">
-              {selectedPatch?.patched_code || "No patch selected"}
-            </pre>
-            <div className="pg-diff-green"></div>
-          </div>
-        </div>
-
-        {/* Explanation + Confidence Row */}
-        <div className="pg-bottom-row">
-
-          {/* Explanation */}
-          <div className="pg-explain-card">
-            <div className="pg-explain-header">
-              <span>AI-generated explanation</span>
-              <span className="pg-tag">CWE</span>
-              <span className="pg-ai-tag">AI</span>
+        <div className="pg6-panel pg6-panel-diff">
+          <div className="pg6-panel-title">Diff Viewer</div>
+          <div className="pg6-diff-grid">
+            <div className="pg6-diff-pane">
+              <div className="pg6-diff-header">
+                <span>Original</span>
+                <button
+                  className="pg6-copy-btn"
+                  onClick={() => copyToClipboard(diffRows.left.map((l) => l.text).join("\n"))}
+                  disabled={!selectedPatch}
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="pg6-diff-body">
+                {diffRows.left.length ? (
+                  diffRows.left.map((line, idx) => (
+                    <div key={`l-${idx}`} className={`pg6-line ${line.type}`}>
+                      <span className="pg6-line-no">{line.no}</span>
+                      <span>{line.text}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pg6-line">
+                    <span className="pg6-line-no"></span>
+                    <span>No patch selected</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <p className="pg-explain-text">
-              {selectedPatch?.explanation ||
-                "Select a patch to see AI explanation."}
-            </p>
-
-            <div className="pg-btn-row">
-              <button
-                className="pg-secondary-btn"
-                onClick={handleRegeneratePatch}
-                disabled={!selectedPatch}
-              >
-                Re-generate
-              </button>
-              <button
-                className="pg-secondary-btn"
-                onClick={handleExportPatch}
-                disabled={!selectedPatch}
-              >
-                Export Patch
-              </button>
-              <button
-                className="pg-secondary-btn"
-                onClick={handleApplyPatch}
-                disabled={!selectedPatch}
-              >
-                Apply Patch
-              </button>
-            </div>
-          </div>
-
-          {/* Confidence Meter */}
-          <div className="pg-confidence-card">
-            <div className="pg-conf-title">Confidence score</div>
-
-            <div className="pg-ring-wrapper">
-              <svg className="pg-ring" viewBox="0 0 36 36">
-                <path
-                  className="pg-ring-bg"
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-                <path
-                  className="pg-ring-fg"
-                  strokeDasharray={`${selectedPatch?.confidence || 0}, 100`}
-                  d="M18 2.0845
-                    a 15.9155 15.9155 0 0 1 0 31.831
-                    a 15.9155 15.9155 0 0 1 0 -31.831"
-                />
-              </svg>
-              <div className="pg-ring-text">
-                {selectedPatch?.confidence
-                  ? Math.round(selectedPatch.confidence * 100)
-                  : 0}
-                %
+            <div className="pg6-diff-pane">
+              <div className="pg6-diff-header">
+                <span>Patched</span>
+                <button
+                  className="pg6-copy-btn"
+                  onClick={() => copyToClipboard(diffRows.right.map((l) => l.text).join("\n"))}
+                  disabled={!selectedPatch}
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="pg6-diff-body">
+                {diffRows.right.length ? (
+                  diffRows.right.map((line, idx) => (
+                    <div key={`r-${idx}`} className={`pg6-line ${line.type}`}>
+                      <span className="pg6-line-no">{line.no}</span>
+                      <span>{line.text}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pg6-line">
+                    <span className="pg6-line-no"></span>
+                    <span>No patch selected</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-
+          <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+            <button
+              className="pg6-copy-btn"
+              onClick={() => copyToClipboard(selectedPatch?.unified_diff || "")}
+              disabled={!selectedPatch}
+            >
+              Copy Unified Diff
+            </button>
+          </div>
         </div>
 
+        <div className="pg6-panel pg6-panel-explain">
+          <div className="pg6-panel-title">Explanation</div>
+          <p className="pg6-explain">
+            {selectedPatch?.explanation ||
+              "Select a patch to see AI explanation."}
+          </p>
+          {selectedPatch?.validations && (
+            <div className="pg6-validation-list">
+              {selectedPatch.validations.map((v) => (
+                <div
+                  key={v.name}
+                  className={`pg6-validation ${v.passed ? "ok" : "bad"}`}
+                >
+                  <span className="pg6-validation-name">{v.name}</span>
+                  <span className="pg6-validation-pill">
+                    {v.passed ? "Passed" : "Failed"}
+                  </span>
+                  <span className="pg6-validation-detail">{v.details}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="pg6-panel pg6-panel-confidence">
+          <div className="pg6-panel-title">Confidence</div>
+          <div className="pg6-ring-wrap">
+            <svg className="pg6-ring" viewBox="0 0 36 36">
+              <path
+                className="pg6-ring-bg"
+                d="M18 2.0845
+                  a 15.9155 15.9155 0 0 1 0 31.831
+                  a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+              <path
+                className="pg6-ring-fg"
+                strokeDasharray={`${selectedPatch?.confidence || 0}, 100`}
+                d="M18 2.0845
+                  a 15.9155 15.9155 0 0 1 0 31.831
+                  a 15.9155 15.9155 0 0 1 0 -31.831"
+              />
+            </svg>
+            <div className="pg6-ring-text">
+              {selectedPatch?.confidence
+                ? Math.round(selectedPatch.confidence * 100)
+                : 0}
+              %
+            </div>
+          </div>
+          <div className="pg6-confidence-foot">
+            Confidence derived from diff, syntax, and semantic checks.
+          </div>
+        </div>
       </div>
     </div>
   );
