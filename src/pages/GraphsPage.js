@@ -1,5 +1,5 @@
 // src/pages/GraphsPage.js
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 import { graphService, scanService } from "../api/services";
@@ -35,6 +35,7 @@ function GraphsPage() {
   const [lastGraphType, setLastGraphType] = useState("AST");
   const pendingGraphKeyRef = useRef("");
   const lastAutoFileForVulnRef = useRef(null);
+  const [vulnView, setVulnView] = useState("all"); // all | ai
 
   // Resolve scan id without forcing a redirect to /scan
   useEffect(() => {
@@ -190,7 +191,14 @@ function GraphsPage() {
     fetchGraph();
   }, [activeScanId, activeFileId, graphType]);
 
-  const vulnerabilitiesForSelector = vulnerabilities;
+  const vulnerabilitiesForSelector = useMemo(() => {
+    if (vulnView === "ai") {
+      return vulnerabilities.filter(
+        (v) => (v.analysis?.llm_classification?.classification) === "VULNERABLE"
+      );
+    }
+    return vulnerabilities;
+  }, [vulnerabilities, vulnView]);
 
   useEffect(() => {
     if (vulnerabilitiesForSelector.length === 0) {
@@ -199,6 +207,12 @@ function GraphsPage() {
     }
     if (!selectedVuln || !vulnerabilitiesForSelector.find((v) => v.id === selectedVuln.id)) {
       setSelectedVuln(vulnerabilitiesForSelector[0]);
+    }
+  }, [vulnerabilitiesForSelector, selectedVuln]);
+
+  useEffect(() => {
+    if (selectedVuln && !vulnerabilitiesForSelector.find((v) => v.id === selectedVuln.id)) {
+      setSelectedVuln(null);
     }
   }, [vulnerabilitiesForSelector, selectedVuln]);
 
@@ -789,6 +803,22 @@ function GraphsPage() {
         {hasScan && vulnerabilitiesForSelector.length > 0 && (
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
             <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Vulnerability:</label>
+            <div className="rp6-toggle">
+              <button
+                type="button"
+                className={`rp6-toggle-btn ${vulnView === "all" ? "active" : ""}`}
+                onClick={() => setVulnView("all")}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                className={`rp6-toggle-btn ${vulnView === "ai" ? "active" : ""}`}
+                onClick={() => setVulnView("ai")}
+              >
+                AI-validated
+              </button>
+            </div>
             <select
               value={selectedVuln?.id || ''}
               onChange={(e) => {

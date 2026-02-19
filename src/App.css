@@ -3228,6 +3228,32 @@ body {
   color: var(--pg6-muted);
 }
 
+.rp6-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0b1220;
+  border: 1px solid #1f2a44;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.rp6-toggle-btn {
+  background: transparent;
+  color: #9ca3af;
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.rp6-toggle-btn.active {
+  background: #1f2a44;
+  color: #e5e7eb;
+}
+
 .rp6-table-wrap {
   max-height: 420px;
   overflow: auto;
@@ -3273,7 +3299,10 @@ body {
 }
 
 .rp6-pill-btn {
-  background: rgba(148, 163, 184, 0.12);
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: rgba(248, 250, 252, 0.9);
+  box-shadow: 0 1px 6px rgba(15, 23, 42, 0.18);
   cursor: pointer;
 }
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { patchService, reportService } from "../api/services";
+import { patchService, reportService, scanService } from "../api/services";
 
 export default function PatchGeneratorPage() {
   //  Extract Query Params
@@ -67,15 +67,23 @@ export default function PatchGeneratorPage() {
   const fetchVulnerabilities = useCallback(async () => {
     if (!activeScanId) return;
     try {
-      const res = await reportService.get(activeScanId);
-      const vulns = res.data?.vulnerabilities || [];
+      let vulns = [];
+      try {
+        const summaryRes = await scanService.getSummary(activeScanId);
+        const summaryData = summaryRes.data || summaryRes;
+        vulns = summaryData?.vulnerabilities || [];
+      } catch {}
+      if (!vulns.length) {
+        const res = await reportService.get(activeScanId);
+        vulns = res.data?.vulnerabilities || [];
+      }
       setVulnerabilities(vulns);
       if (vulns.length > 0) setSelectedVuln(vulns[0].id);
     } catch (err) {
       console.error("Failed to fetch vulnerabilities from API:", err);
 
-      // Fallback to sessionStorage
-      const cached = sessionStorage.getItem(`scan_${activeScanId}`);
+      // Fallback to localStorage
+      const cached = localStorage.getItem(`scan_${activeScanId}`);
       if (cached) {
         const scanData = JSON.parse(cached);
         const vulns = scanData.vulnerabilities || [];

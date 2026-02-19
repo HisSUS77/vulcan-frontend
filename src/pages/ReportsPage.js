@@ -15,11 +15,11 @@ export default function ReportsPage() {
   const [filterBy, setFilterBy] = useState("Severity");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [summary, setSummary] = useState({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
   const [selectedVuln, setSelectedVuln] = useState(null);
   const [exportMessage, setExportMessage] = useState("");
   const [patchFilter, setPatchFilter] = useState("all");
   const [patchSearch, setPatchSearch] = useState("");
+  const [vulnView, setVulnView] = useState("all"); // all | ai
 
   const normalizeVulns = useCallback((rawVulns, prev = []) => {
     const prevMap = new Map(prev.map((v) => [v.id, v]));
@@ -55,25 +55,34 @@ export default function ReportsPage() {
     });
   }, []);
 
-  const applyVulnsAndSummary = useCallback((rawVulns, normalizedSummary) => {
+  const applyVulnsAndSummary = useCallback((rawVulns) => {
     setVulnerabilities((prev) => {
       const merged = normalizeVulns(rawVulns, prev);
-      const bySeverity = normalizedSummary.by_severity || {};
-      const total = normalizedSummary.vulnerabilities_found | normalizedSummary.total_vulns | 0;
-      const avgConfidence = merged.length > 0
-        ? Math.round(merged.reduce((sum, v) => sum + v.confidence, 0) / merged.length)
-        : 0;
-      setSummary({
-        total,
-        critical: bySeverity.critical || 0,
-        high: bySeverity.high || 0,
-        medium: bySeverity.medium || 0,
-        low: bySeverity.low || 0,
-        accuracy: avgConfidence,
-      });
       return merged;
     });
   }, [normalizeVulns]);
+
+  const filteredVulnerabilities = useMemo(() => {
+    if (vulnView === "ai") {
+      return vulnerabilities.filter(
+        (v) => (v.analysis?.llm_classification?.classification || v.llmClassification) === "VULNERABLE"
+      );
+    }
+    return vulnerabilities;
+  }, [vulnerabilities, vulnView]);
+
+  const filteredSummary = useMemo(() => {
+    const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+    for (const v of filteredVulnerabilities) {
+      const sev = (v.severity || "Medium").toLowerCase();
+      if (bySeverity[sev] !== undefined) bySeverity[sev] += 1;
+    }
+    const total = filteredVulnerabilities.length;
+    const avgConfidence = total
+      ? Math.round(filteredVulnerabilities.reduce((sum, v) => sum + (v.confidence || 0), 0) / total)
+      : 0;
+    return { total, ...bySeverity, accuracy: avgConfidence };
+  }, [filteredVulnerabilities]);
 
   const fetchScans = useCallback(async () => {
     try {
@@ -136,7 +145,7 @@ export default function ReportsPage() {
             ...prev,
             ...normalizedSummary,
           }));
-          applyVulnsAndSummary(scanData.vulnerabilities, normalizedSummary);
+          applyVulnsAndSummary(scanData.vulnerabilities);
           setLoading(false);
         } catch {}
       }
@@ -178,7 +187,7 @@ export default function ReportsPage() {
         ...normalizedSummary,
       }));
 
-      applyVulnsAndSummary(scanData.vulnerabilities, normalizedSummary);
+      applyVulnsAndSummary(scanData.vulnerabilities);
       localStorage.setItem(`scan_${scanId}`, JSON.stringify(scanData));
     } catch (err) {
       console.error("Failed to fetch scan data:", err);
@@ -205,9 +214,14 @@ export default function ReportsPage() {
     if (!selectedScan) {
       setScanSummary(null);
       setVulnerabilities([]);
-      setSummary({ total: 0, critical: 0, high: 0, medium: 0, low: 0, accuracy: 0 });
     }
   }, [selectedScan]);
+
+  useEffect(() => {
+    if (selectedVuln && !filteredVulnerabilities.find((v) => v.id === selectedVuln.id)) {
+      setSelectedVuln(null);
+    }
+  }, [filteredVulnerabilities, selectedVuln]);
 
   const handleExportJSON = () => {
     if (!scanSummary) return;
@@ -217,10 +231,10 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
-    if (!vulnerabilities.length) return;
+    if (!filteredVulnerabilities.length) return;
 
     const headers = ["ID", "Type", "Severity", "CWE", "OWASP", "File", "Lines", "Confidence", "Source", "Sink"];
-    const rows = vulnerabilities.map((v) => [
+    const rows = filteredVulnerabilities.map((v) => [
       v.id,
       v.type,
       v.severity,
@@ -300,13 +314,13 @@ export default function ReportsPage() {
           </p>
         </div>
         <div className="rp6-exports">
-          <button className="rp6-btn" onClick={handleExportJSON} disabled={!vulnerabilities.length}>
+          <button className="rp6-btn" onClick={handleExportJSON} disabled={!filteredVulnerabilities.length}>
             Export JSON
           </button>
-          <button className="rp6-btn" onClick={handleExportCSV} disabled={!vulnerabilities.length}>
+          <button className="rp6-btn" onClick={handleExportCSV} disabled={!filteredVulnerabilities.length}>
             Export CSV
           </button>
-          <button className="rp6-btn rp6-btn-primary" onClick={handleExportPDF} disabled={!vulnerabilities.length}>
+          <button className="rp6-btn rp6-btn-primary" onClick={handleExportPDF} disabled={!filteredVulnerabilities.length}>
             Export PDF
           </button>
         </div>
@@ -325,7 +339,7 @@ export default function ReportsPage() {
             {scans.map((s) => {
               const date = new Date(s.created_at).toLocaleDateString();
               const time = new Date(s.created_at).toLocaleTimeString();
-              const vulnCount = s.total_vulns | s.vulnerabilities_found | 0;
+              const vulnCount = s.total_vulns || s.vulnerabilities_found || 0;
               return (
                 <option key={s.scan_id || s.id} value={s.scan_id || s.id}>
                   {(s.scan_id || s.id)} - {date} {time} ({vulnCount} vulns)
@@ -347,27 +361,27 @@ export default function ReportsPage() {
       <div className="rp6-summary">
         <div className="rp6-card">
           <div className="rp6-label">Total</div>
-          <div className="rp6-value">{summary.total}</div>
+          <div className="rp6-value">{filteredSummary.total}</div>
         </div>
         <div className="rp6-card">
           <div className="rp6-label">Critical</div>
-          <div className="rp6-value rp6-critical">{summary.critical}</div>
+          <div className="rp6-value rp6-critical">{filteredSummary.critical}</div>
         </div>
         <div className="rp6-card">
           <div className="rp6-label">High</div>
-          <div className="rp6-value rp6-high">{summary.high}</div>
+          <div className="rp6-value rp6-high">{filteredSummary.high}</div>
         </div>
         <div className="rp6-card">
           <div className="rp6-label">Medium</div>
-          <div className="rp6-value rp6-medium">{summary.medium}</div>
+          <div className="rp6-value rp6-medium">{filteredSummary.medium}</div>
         </div>
         <div className="rp6-card">
           <div className="rp6-label">Low</div>
-          <div className="rp6-value rp6-low">{summary.low}</div>
+          <div className="rp6-value rp6-low">{filteredSummary.low}</div>
         </div>
         <div className="rp6-card">
           <div className="rp6-label">Avg Confidence</div>
-          <div className="rp6-value rp6-accuracy">{summary.accuracy}%</div>
+          <div className="rp6-value rp6-accuracy">{filteredSummary.accuracy}%</div>
         </div>
       </div>
 
@@ -383,6 +397,22 @@ export default function ReportsPage() {
           <div className="rp6-panel-header">
             <div className="rp6-panel-title">Vulnerabilities</div>
             <div className="rp6-filter">
+              <div className="rp6-toggle">
+                <button
+                  type="button"
+                  className={`rp6-toggle-btn ${vulnView === "all" ? "active" : ""}`}
+                  onClick={() => setVulnView("all")}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  className={`rp6-toggle-btn ${vulnView === "ai" ? "active" : ""}`}
+                  onClick={() => setVulnView("ai")}
+                >
+                  AI-validated
+                </button>
+              </div>
               <span>Filter</span>
               <select className="rp6-select" value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
                 <option value="Severity">Severity</option>
@@ -410,8 +440,8 @@ export default function ReportsPage() {
                   <tr>
                     <td colSpan="8" className="rp6-empty-row">Select a scan to view its report.</td>
                   </tr>
-                ) : vulnerabilities.length > 0 ? (
-                  vulnerabilities.map((row) => (
+                ) : filteredVulnerabilities.length > 0 ? (
+                  filteredVulnerabilities.map((row) => (
                     <tr
                       key={row.id}
                       onClick={() => setSelectedVuln(selectedVuln?.id === row.id ? null : row)}
