@@ -14,7 +14,7 @@ function GraphsPage() {
   const [activeScanId, setActiveScanId] = useState(
     scanId || localStorage.getItem("lastScanId") || null
   );
-  
+
   const [graphType, setGraphType] = useState("AST");
   const [graphData, setGraphData] = useState(null);
   const [lastGraphData, setLastGraphData] = useState(null);
@@ -91,7 +91,7 @@ function GraphsPage() {
   // Fetch scan summary to get vulnerabilities
   useEffect(() => {
     if (!activeScanId) return;
-    
+
     const fetchVulnerabilities = async () => {
       try {
         const response = await scanService.getSummary(activeScanId);
@@ -152,7 +152,7 @@ function GraphsPage() {
   // Fetch graph data
   useEffect(() => {
     if (!activeScanId) return;
-    
+
     const fetchGraph = async () => {
       try {
         const requestKey = `${activeScanId}:${activeFileId}:${graphType}`;
@@ -341,16 +341,9 @@ function GraphsPage() {
   const renderGraph = () => {
     if (!hasScan && !displayGraphData) {
       return (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '500px',
-          gap: '1rem',
-          color: '#94a3b8'
-        }}>
-          <div style={{ fontSize: '1.2rem' }}>Select a scan to view graphs.</div>
+        <div className="gp-state">
+          <div className="gp-state-icon">// NO SCAN //</div>
+          <div className="gp-state-text">Select a scan to view graphs.</div>
           <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
             Start a scan
           </button>
@@ -360,51 +353,32 @@ function GraphsPage() {
 
     if ((loading || initialLoad) && (!displayGraphData || !displayGraphData.nodes || displayGraphData.nodes.length === 0)) {
       return (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '500px',
-          fontSize: '1.2rem',
-          color: '#666'
-        }}>
-          Loading {graphType} graph...
+        <div className="gp-state">
+          <div className="gp-state-icon">LOADING {graphType}</div>
+          <div className="gp-loading-bar-wrap">
+            <div className="gp-loading-bar" />
+          </div>
+          <div className="gp-state-text">Fetching {graphType} graph data...</div>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '500px',
-          gap: '1rem'
-        }}>
-          <div style={{ fontSize: '3rem' }}>Graph error</div>
-          <div style={{ fontSize: '1.2rem', color: '#666' }}>{error}</div>
-          <div style={{ fontSize: '0.9rem', color: '#999' }}>
-            Try switching to CPG or choose another file.
-          </div>
+        <div className="gp-state">
+          <div className="gp-state-icon">// ERROR //</div>
+          <div className="gp-state-text">{error}</div>
+          <div className="gp-state-sub">Try switching to CPG or choose another file.</div>
         </div>
       );
     }
 
     if (!displayGraphData || !displayGraphData.nodes || displayGraphData.nodes.length === 0) {
       return (
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column',
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '500px',
-          gap: '1rem'
-        }}>
-          <div style={{ fontSize: '3rem' }}>No data</div>
-          <div style={{ fontSize: '1.2rem', color: '#666' }}>No graph data available</div>
-          <div style={{ fontSize: '0.9rem', color: '#999' }}>
+        <div className="gp-state">
+          <div className="gp-state-icon">// NO DATA //</div>
+          <div className="gp-state-text">No graph data available</div>
+          <div className="gp-state-sub">
             Run a scan on this file or select another file from the list.
           </div>
         </div>
@@ -439,13 +413,13 @@ function GraphsPage() {
     }
 
     return (
-      <svg 
-        width="100%" 
-        height="600" 
+      <svg
+        width="100%"
+        height="600"
         viewBox="0 0 800 600"
-        style={{ background: '#0a0e1a', borderRadius: '8px' }}
+        style={{ background: '#080d1a', borderRadius: '8px', border: '1px solid rgba(34,211,238,0.08)' }}
       >
-        {/* Define arrow marker */}
+        {/* Define arrow markers */}
         <defs>
           <marker
             id="arrowhead"
@@ -456,7 +430,7 @@ function GraphsPage() {
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L0,6 L9,3 z" fill="#666" />
+            <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
           </marker>
           <marker
             id="arrowhead-red"
@@ -467,7 +441,7 @@ function GraphsPage() {
             orient="auto"
             markerUnits="strokeWidth"
           >
-            <path d="M0,0 L0,6 L9,3 z" fill="#ff0000" />
+            <path d="M0,0 L0,6 L9,3 z" fill="#ef4444" />
           </marker>
         </defs>
 
@@ -476,16 +450,16 @@ function GraphsPage() {
           {edgesToShow.map((edge, idx) => {
             const fromNode = nodesToShow.find(n => n.id === edge.from);
             const toNode = nodesToShow.find(n => n.id === edge.to);
-            
+
             if (!fromNode || !toNode) return null;
 
             const fromPos = getNodePosition(nodesToShow.indexOf(fromNode), nodesToShow.length);
             const toPos = getNodePosition(nodesToShow.indexOf(toNode), nodesToShow.length);
 
             const isInPath = vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to);
-            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.2) : (isInPath ? 0.95 : 0.6);
-            const edgeStroke = isInPath ? "#ff0000" : "#334155";
-            const edgeWidth = isInPath ? 3 : 1.4;
+            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.15) : (isInPath ? 0.95 : 0.5);
+            const edgeStroke = isInPath ? "#ef4444" : "#1e3a5f";
+            const edgeWidth = isInPath ? 3 : 1.2;
             const edgeMarker = isInPath && isPathMode ? "url(#arrowhead-red)" : "none";
 
             return (
@@ -503,7 +477,7 @@ function GraphsPage() {
                   {isInPath && (
                     <animate
                       attributeName="stroke-opacity"
-                      values="1;0.5;1"
+                      values="1;0.4;1"
                       dur="1.5s"
                       repeatCount="indefinite"
                     />
@@ -513,7 +487,7 @@ function GraphsPage() {
                 <text
                   x={(fromPos.x + toPos.x) / 2}
                   y={(fromPos.y + toPos.y) / 2}
-                  fill={isInPath ? "#ff6b6b" : "#94a3b8"}
+                  fill={isInPath ? "#f87171" : "#334155"}
                   fontSize="9"
                   textAnchor="middle"
                 >
@@ -542,7 +516,7 @@ function GraphsPage() {
                   stroke="#ef4444"
                   strokeWidth={isPathMode ? 3.5 : 2}
                   markerEnd="url(#arrowhead-red)"
-                  opacity={isPathMode ? 0.95 : 0.7}
+                  opacity={isPathMode ? 0.95 : 0.65}
                 />
               );
             })}
@@ -559,16 +533,19 @@ function GraphsPage() {
             const isSink = node.id === pathArray[pathArray.length - 1];
             const isSelected = selectedNode?.id === node.id;
 
-            let fillColor = '#1a1f35';
-            if (isSource) fillColor = '#ff6b6b';
-            else if (isSink) fillColor = '#cc0000';
-            else if (isInPath) fillColor = '#ffd93d';
-            else if (node.tainted) fillColor = '#ffec99';
+            let fillColor = '#0d1424';
+            if (isSource) fillColor = '#7f1d1d';
+            else if (isSink) fillColor = '#450a0a';
+            else if (isInPath) fillColor = '#78350f';
+            else if (node.tainted) fillColor = '#3d2e0a';
+
+            const strokeColor = isSelected ? "#22d3ee" : (isInPath ? "#ef4444" : "#1e3a5f");
+            const strokeWidth = isSelected ? 3 : (isInPath ? 2.5 : 1.5);
 
             return (
-              <g 
-                key={node.id} 
-                className="node" 
+              <g
+                key={node.id}
+                className="node"
                 style={{ cursor: 'pointer' }}
                 onClick={() => setSelectedNode(node)}
               >
@@ -578,25 +555,25 @@ function GraphsPage() {
                   cy={pos.y}
                   r={isInPath ? 30 : 22}
                   fill={fillColor}
-                  stroke={isSelected ? "#00ff00" : (isInPath ? "#ff0000" : "#4a5568")}
-                  strokeWidth={isSelected ? 4 : (isInPath ? 3 : 2)}
-                  opacity={0.9}
+                  stroke={strokeColor}
+                  strokeWidth={strokeWidth}
+                  opacity={0.92}
                 >
                   {isInPath && (
                     <animate
                       attributeName="r"
-                      values={isInPath ? "30;35;30" : "22;25;22"}
+                      values="30;34;30"
                       dur="2s"
                       repeatCount="indefinite"
                     />
                   )}
                 </circle>
-                
+
                 {/* Node label */}
                 <text
                   x={pos.x}
                   y={pos.y - 35}
-                  fill="#e5e7eb"
+                  fill={isInPath ? "#fca5a5" : "#94a3b8"}
                   fontSize="11"
                   fontWeight={isInPath ? "bold" : "normal"}
                   textAnchor="middle"
@@ -604,12 +581,12 @@ function GraphsPage() {
                 >
                   {node.label.length > 15 ? node.label.substring(0, 15) + '...' : node.label}
                 </text>
-                
+
                 {/* Node type */}
                 <text
                   x={pos.x}
-                  y={pos.y + 40}
-                  fill="#9ca3af"
+                  y={pos.y + 42}
+                  fill="#334155"
                   fontSize="9"
                   textAnchor="middle"
                   pointerEvents="none"
@@ -621,13 +598,13 @@ function GraphsPage() {
                 {node.properties?.line && (
                   <text
                     x={pos.x}
-                    y={pos.y + 52}
-                    fill="#6b7280"
+                    y={pos.y + 54}
+                    fill="#1e3a5f"
                     fontSize="8"
                     textAnchor="middle"
                     pointerEvents="none"
                   >
-                    Line {node.properties.line}
+                    L{node.properties.line}
                   </text>
                 )}
               </g>
@@ -637,35 +614,29 @@ function GraphsPage() {
 
         {/* Legend */}
         <g className="legend" transform="translate(15, 15)">
-          <rect width="180" height="130" fill="#1a1f35" opacity="0.9" rx="5" />
-          
-          <circle cx="15" cy="18" r="7" fill="#ff6b6b" />
-          <text x="28" y="22" fill="#e5e7eb" fontSize="11">Taint Source</text>
-          
-          <circle cx="15" cy="38" r="7" fill="#ffd93d" />
-          <text x="28" y="42" fill="#e5e7eb" fontSize="11">Flow Path</text>
-          
-          <circle cx="15" cy="58" r="7" fill="#cc0000" />
-          <text x="28" y="62" fill="#e5e7eb" fontSize="11">Taint Sink</text>
-          
-          <circle cx="15" cy="78" r="7" fill="#ffec99" />
-          <text x="28" y="82" fill="#e5e7eb" fontSize="11">Tainted Node</text>
-          
-          <circle cx="15" cy="98" r="7" fill="#1a1f35" stroke="#4a5568" strokeWidth="2" />
-          <text x="28" y="102" fill="#e5e7eb" fontSize="11">Normal Node</text>
-          
-          <circle cx="15" cy="118" r="7" fill="#1a1f35" stroke="#00ff00" strokeWidth="3" />
-          <text x="28" y="122" fill="#e5e7eb" fontSize="11">Selected</text>
+          <rect width="150" height="125" fill="rgba(8,13,26,0.92)" rx="5" stroke="rgba(34,211,238,0.12)" strokeWidth="1" />
+          <circle cx="15" cy="18" r="6" fill="#7f1d1d" stroke="#ef4444" strokeWidth="1.5" />
+          <text x="27" y="22" fill="#94a3b8" fontSize="10" fontFamily="monospace">Taint Source</text>
+          <circle cx="15" cy="38" r="6" fill="#78350f" stroke="#f59e0b" strokeWidth="1.5" />
+          <text x="27" y="42" fill="#94a3b8" fontSize="10" fontFamily="monospace">Flow Path</text>
+          <circle cx="15" cy="58" r="6" fill="#450a0a" stroke="#dc2626" strokeWidth="1.5" />
+          <text x="27" y="62" fill="#94a3b8" fontSize="10" fontFamily="monospace">Taint Sink</text>
+          <circle cx="15" cy="78" r="6" fill="#3d2e0a" stroke="#b45309" strokeWidth="1.5" />
+          <text x="27" y="82" fill="#94a3b8" fontSize="10" fontFamily="monospace">Tainted Node</text>
+          <circle cx="15" cy="98" r="6" fill="#0d1424" stroke="#1e3a5f" strokeWidth="1.5" />
+          <text x="27" y="102" fill="#94a3b8" fontSize="10" fontFamily="monospace">Normal Node</text>
+          <circle cx="15" cy="118" r="6" fill="#0d1424" stroke="#22d3ee" strokeWidth="2.5" />
+          <text x="27" y="122" fill="#22d3ee" fontSize="10" fontFamily="monospace">Selected</text>
         </g>
 
         {/* Stats */}
         {displayGraphData.meta && (
-          <g className="stats" transform="translate(605, 15)">
-            <rect width="180" height="75" fill="#1a1f35" opacity="0.9" rx="5" />
-            <text x="10" y="22" fill="#e5e7eb" fontSize="11" fontWeight="bold">Graph Stats</text>
-            <text x="10" y="40" fill="#9ca3af" fontSize="10">Nodes: {nodesToShow.length}/{displayGraphData.meta.total_nodes}</text>
-            <text x="10" y="55" fill="#9ca3af" fontSize="10">Edges: {edgesToShow.length}/{displayGraphData.meta.total_edges}</text>
-            <text x="10" y="70" fill="#9ca3af" fontSize="10">Tainted: {displayGraphData.meta.tainted_nodes}</text>
+          <g className="stats" transform="translate(620, 15)">
+            <rect width="165" height="78" fill="rgba(8,13,26,0.92)" rx="5" stroke="rgba(34,211,238,0.12)" strokeWidth="1" />
+            <text x="10" y="20" fill="rgba(34,211,238,0.7)" fontSize="9" fontFamily="monospace" letterSpacing="2">GRAPH STATS</text>
+            <text x="10" y="38" fill="#475569" fontSize="10" fontFamily="monospace">Nodes: {nodesToShow.length}/{displayGraphData.meta.total_nodes}</text>
+            <text x="10" y="53" fill="#475569" fontSize="10" fontFamily="monospace">Edges: {edgesToShow.length}/{displayGraphData.meta.total_edges}</text>
+            <text x="10" y="68" fill="#475569" fontSize="10" fontFamily="monospace">Tainted: {displayGraphData.meta.tainted_nodes}</text>
           </g>
         )}
       </svg>
@@ -673,90 +644,37 @@ function GraphsPage() {
   };
 
   return (
-    <div className="rv-page" style={{ height: '100vh', overflow: 'hidden' }}>
+    <div className="gp-page">
       {/* Header */}
-      <div style={{ 
-        padding: '1.5rem', 
-        background: '#020617',
-        borderBottom: '1px solid #1f2937'
-      }}>
-        <h1 style={{ 
-          margin: '0 0 0.5rem 0', 
-          fontSize: '1.8rem',
-          color: '#e5e7eb'
-        }}>
+      <div className="gp-header">
+        <h1 className="gp-title" data-text="GRAPH VISUALIZATION">
           Graph Visualization
         </h1>
-        <p style={{ margin: 0, color: '#9ca3af', fontSize: '0.9rem' }}>
-          Scan ID: <code style={{ 
-            background: '#1f2937', 
-            padding: '2px 8px', 
-            borderRadius: '4px',
-            color: '#60a5fa'
-          }}>{displayScanId || "-"}</code>
+        <p className="gp-scan-id">
+          SCAN_ID: <code>{displayScanId || "-"}</code>
         </p>
       </div>
 
       {/* Controls */}
-      <div style={{ 
-        padding: '1rem 1.5rem',
-        background: '#0a0e1a',
-        borderBottom: '1px solid #1f2937',
-        display: 'flex',
-        gap: '1rem',
-        alignItems: 'center',
-        flexWrap: 'wrap'
-      }}>
+      <div className="gp-controls">
         {!hasScan && displayGraphData && (
-          <div style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '1rem',
-            padding: '0.5rem 0.75rem',
-            background: '#111827',
-            border: '1px solid #1f2937',
-            borderRadius: '8px',
-            color: '#cbd5f5',
-            fontSize: '0.85rem'
-          }}>
-            <span>Showing the last loaded graph. Select a scan to update it.</span>
-            <button
-              onClick={clearView}
-              style={{
-                padding: '0.35rem 0.75rem',
-                background: '#1f2937',
-                color: '#e5e7eb',
-                border: '1px solid #374151',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.8rem'
-              }}
-            >
+          <div className="gp-stale-banner">
+            <span>Showing last loaded graph. Select a scan to update it.</span>
+            <button className="gp-clear-btn" onClick={clearView}>
               Clear view
             </button>
           </div>
         )}
+
         {/* Graph Type Selector */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Graph Type:</label>
+        <div className="gp-type-group">
+          <span className="gp-type-label">Type:</span>
           {GRAPH_TYPES.map(type => (
             <button
               key={type}
               onClick={() => setGraphType(type)}
               disabled={!hasScan || showDataFlow || showOnlyPath}
-              style={{
-                padding: '0.5rem 1rem',
-                background: graphType === type ? '#3b82f6' : '#1f2937',
-                color: graphType === type ? 'white' : '#9ca3af',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: !hasScan || showDataFlow || showOnlyPath ? 'not-allowed' : 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: graphType === type ? 'bold' : 'normal',
-                opacity: !hasScan || showDataFlow || showOnlyPath ? 0.6 : 1
-              }}
+              className={`gp-type-btn${graphType === type ? " gp-type-btn--active" : ""}`}
             >
               {type}
             </button>
@@ -765,8 +683,8 @@ function GraphsPage() {
 
         {/* File Selector */}
         {hasScan && availableFiles.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>File:</label>
+          <div className="gp-file-group">
+            <span className="gp-type-label">File:</span>
             <select
               value={activeFileId}
               onChange={(e) => {
@@ -775,15 +693,7 @@ function GraphsPage() {
                 navigate(`/graphs?scanId=${activeScanId}&fileId=${nextId}`, { replace: true });
               }}
               disabled={!hasScan}
-              style={{
-                padding: '0.5rem',
-                background: '#1f2937',
-                color: '#e5e7eb',
-                border: '1px solid #374151',
-                borderRadius: '6px',
-                fontSize: '0.9rem',
-                minWidth: '220px'
-              }}
+              className="gp-select gp-select--wide"
             >
               {availableFiles.map((file) => (
                 <option key={file.id} value={file.id}>
@@ -792,7 +702,7 @@ function GraphsPage() {
               ))}
             </select>
             {activeFilePath && (
-              <span style={{ color: "#94a3b8", fontSize: "0.8rem" }} title={activeFilePath}>
+              <span className="gp-file-path" title={activeFilePath}>
                 {activeFilePath}
               </span>
             )}
@@ -801,8 +711,8 @@ function GraphsPage() {
 
         {/* Vulnerability Selector */}
         {hasScan && vulnerabilitiesForSelector.length > 0 && (
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flex: 1 }}>
-            <label style={{ color: '#9ca3af', fontSize: '0.9rem' }}>Vulnerability:</label>
+          <div className="gp-vuln-group">
+            <span className="gp-type-label">Vuln:</span>
             <div className="rp6-toggle">
               <button
                 type="button"
@@ -828,16 +738,7 @@ function GraphsPage() {
                 setShowOnlyPath(false);
               }}
               disabled={!hasScan}
-              style={{
-                padding: '0.5rem',
-                background: '#1f2937',
-                color: '#e5e7eb',
-                border: '1px solid #374151',
-                borderRadius: '6px',
-                fontSize: '0.9rem',
-                flex: 1,
-                maxWidth: '400px'
-              }}
+              className="gp-select gp-select--flex"
             >
               {vulnerabilitiesForSelector.map(vuln => (
                 <option key={vuln.id} value={vuln.id}>
@@ -861,18 +762,9 @@ function GraphsPage() {
                   disablePathViewIfNeeded(false, showOnlyPath);
                 }
               }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: showDataFlow ? '#ef4444' : '#1f2937',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: showDataFlow ? 'bold' : 'normal'
-              }}
+              className={`gp-flow-btn${showDataFlow ? " gp-flow-btn--red" : ""}`}
             >
-              {showDataFlow ? 'Hide Data Flow' : 'Show Data Flow Path'}
+              {showDataFlow ? 'Hide Data Flow' : 'Show Data Flow'}
             </button>
             <button
               onClick={() => {
@@ -884,32 +776,12 @@ function GraphsPage() {
                   disablePathViewIfNeeded(showDataFlow, false);
                 }
               }}
-              style={{
-                padding: '0.5rem 1rem',
-                background: showOnlyPath ? '#f59e0b' : '#1f2937',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                fontWeight: showOnlyPath ? 'bold' : 'normal'
-              }}
+              className={`gp-flow-btn${showOnlyPath ? " gp-flow-btn--amber" : ""}`}
             >
-              {showOnlyPath ? 'Show Full Graph' : 'Only Path Nodes'}
+              {showOnlyPath ? 'Full Graph' : 'Only Path'}
             </button>
-            <button
-              onClick={resetView}
-              style={{
-                padding: '0.5rem 1rem',
-                background: '#1f2937',
-                color: '#e5e7eb',
-                border: '1px solid #374151',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '0.9rem'
-              }}
-            >
-              Reset view
+            <button onClick={resetView} className="gp-flow-btn">
+              Reset
             </button>
           </>
         )}
@@ -917,77 +789,35 @@ function GraphsPage() {
 
       {/* Vulnerability Info Banner */}
       {selectedVuln && (
-        <div style={{
-          padding: '1rem 1.5rem',
-          background: '#7f1d1d',
-          borderBottom: '2px solid #991b1b',
-          color: '#fecaca'
-        }}>
-          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="gp-vuln-banner">
+          <div className="gp-vuln-banner-row">
+            <div><strong>Type:</strong> {selectedVuln.type}</div>
             <div>
-              <strong>Type:</strong> {selectedVuln.type}
+              <strong>Severity:</strong>{" "}
+              <span className="gp-vuln-severity-tag">{selectedVuln.severity}</span>
             </div>
-            <div>
-              <strong>Severity:</strong> <span style={{ 
-                padding: '2px 8px', 
-                background: '#991b1b',
-                borderRadius: '4px',
-                fontWeight: 'bold'
-              }}>{selectedVuln.severity}</span>
-            </div>
-            <div>
-              <strong>Source:</strong> <code>{selectedVuln.evidence?.source}</code>
-            </div>
-            <div>
-              <strong>Sink:</strong> <code>{selectedVuln.evidence?.sink}</code>
-            </div>
-            <div>
-              <strong>Path Nodes:</strong> {selectedVuln.evidence?.data_flow_path?.length || 0}
-            </div>
+            <div><strong>Source:</strong> <code>{selectedVuln.evidence?.source}</code></div>
+            <div><strong>Sink:</strong> <code>{selectedVuln.evidence?.sink}</code></div>
+            <div><strong>Path Nodes:</strong> {selectedVuln.evidence?.data_flow_path?.length || 0}</div>
           </div>
         </div>
       )}
 
       {/* Graph Canvas with Node Info Panel */}
-      <div style={{ 
-        flex: 1,
-        display: 'flex',
-        overflow: 'hidden',
-        gap: '1rem',
-        background: '#0a0e1a',
-        padding: '1rem'
-      }}>
+      <div className="gp-canvas-area">
         {/* Main Graph */}
-        <div style={{ flex: selectedNode ? 2 : 1, overflow: 'auto' }}>
+        <div className={showSidePanel ? "gp-canvas-wrap gp-canvas-wrap--narrow" : "gp-canvas-wrap"}>
           {renderGraph()}
         </div>
 
         {/* Side Panel */}
         {showSidePanel && (
-          <div style={{
-            flex: 1,
-            background: '#020617',
-            borderRadius: '8px',
-            padding: '1.5rem',
-            border: '1px solid #1f2937',
-            maxHeight: '600px',
-            overflow: 'auto',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.25rem'
-          }}>
+          <div className="gp-side">
 
             {vulnerabilitiesForSelector.length > 0 && (
-              <div style={{
-                background: '#111827',
-                borderRadius: '8px',
-                padding: '1rem',
-                border: '1px solid #1f2937'
-              }}>
-                <div style={{ color: '#e5e7eb', fontSize: '0.95rem', fontWeight: 600, marginBottom: '0.75rem' }}>
-                  Vulnerabilities in file
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="gp-side-vuln-section">
+                <div className="gp-side-vuln-title">Vulnerabilities in file</div>
+                <div className="gp-vuln-list">
                   {vulnerabilitiesForSelector.map((vuln) => (
                     <button
                       key={vuln.id}
@@ -996,145 +826,79 @@ function GraphsPage() {
                         setShowDataFlow(false);
                         setShowOnlyPath(false);
                       }}
-                      style={{
-                        textAlign: 'left',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '6px',
-                        border: selectedVuln?.id === vuln.id ? '1px solid #ef4444' : '1px solid #1f2937',
-                        background: selectedVuln?.id === vuln.id ? '#3f1d1d' : '#0f172a',
-                        color: '#e5e7eb',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem'
-                      }}
+                      className={`gp-vuln-item${selectedVuln?.id === vuln.id ? " gp-vuln-item--active" : ""}`}
                     >
-                      <div style={{ fontWeight: 600 }}>{vuln.type}</div>
-                      <div style={{ color: '#94a3b8', fontSize: '0.78rem' }}>
-                        {vuln.severity} • Line {vuln.location?.start_line || '-'}
+                      <div className="gp-vuln-item-name">{vuln.type}</div>
+                      <div className="gp-vuln-item-meta">
+                        {vuln.severity} &bull; Line {vuln.location?.start_line || '-'}
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
             )}
+
             {selectedNode ? (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 style={{ margin: 0, color: '#e5e7eb', fontSize: '1.2rem' }}>Node Information</h3>
-                  <button
-                    onClick={() => setSelectedNode(null)}
-                    style={{
-                      background: '#374151',
-                      border: 'none',
-                      borderRadius: '4px',
-                      color: '#9ca3af',
-                      cursor: 'pointer',
-                      padding: '0.25rem 0.75rem',
-                      fontSize: '1rem'
-                    }}
-                  >
-                    X
+                <div className="gp-node-header">
+                  <h3 className="gp-node-title">Node Information</h3>
+                  <button className="gp-close-btn" onClick={() => setSelectedNode(null)}>
+                    ✕
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="gp-node-fields">
                   <div>
-                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>ID</div>
-                    <div style={{
-                      color: '#e5e7eb',
-                      fontSize: '0.9rem',
-                      background: '#1f2937',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                      wordBreak: 'break-all'
-                    }}>
-                      {selectedNode.id}
-                    </div>
+                    <div className="gp-field-label">ID</div>
+                    <div className="gp-field-value">{selectedNode.id}</div>
                   </div>
 
                   <div>
-                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Label</div>
-                    <div style={{
-                      color: '#e5e7eb',
-                      fontSize: '1rem',
-                      fontWeight: 'bold',
-                      background: '#1f2937',
-                      padding: '0.5rem',
-                      borderRadius: '4px'
-                    }}>
-                      {selectedNode.label}
-                    </div>
+                    <div className="gp-field-label">Label</div>
+                    <div className="gp-field-value" style={{ fontWeight: 600 }}>{selectedNode.label}</div>
                   </div>
 
                   <div>
-                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Type</div>
-                    <div style={{
-                      color: '#60a5fa',
-                      fontSize: '0.9rem',
-                      background: '#1f2937',
-                      padding: '0.5rem',
-                      borderRadius: '4px'
-                    }}>
-                      {selectedNode.type}
-                    </div>
+                    <div className="gp-field-label">Type</div>
+                    <div className="gp-field-value gp-field-value--blue">{selectedNode.type}</div>
                   </div>
 
                   {selectedNode.node_type && (
                     <div>
-                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Node Type</div>
-                      <div style={{
-                        color: '#a78bfa',
-                        fontSize: '0.9rem',
-                        background: '#1f2937',
-                        padding: '0.5rem',
-                        borderRadius: '4px'
-                      }}>
-                        {selectedNode.node_type}
-                      </div>
+                      <div className="gp-field-label">Node Type</div>
+                      <div className="gp-field-value gp-field-value--purple">{selectedNode.node_type}</div>
                     </div>
                   )}
 
                   <div>
-                    <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Tainted</div>
-                    <div style={{
-                      color: selectedNode.tainted ? '#fbbf24' : '#10b981',
-                      fontSize: '0.9rem',
-                      background: '#1f2937',
-                      padding: '0.5rem',
-                      borderRadius: '4px',
-                      fontWeight: 'bold'
-                    }}>
+                    <div className="gp-field-label">Tainted</div>
+                    <div className={`gp-field-value ${selectedNode.tainted ? "gp-field-value--tainted" : "gp-field-value--safe"}`}>
                       {selectedNode.tainted ? 'YES' : 'NO'}
                     </div>
                   </div>
 
                   {selectedNode.properties && (
                     <div>
-                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>Properties</div>
-                      <div style={{
-                        color: '#e5e7eb',
-                        fontSize: '0.85rem',
-                        background: '#1f2937',
-                        padding: '0.75rem',
-                        borderRadius: '4px'
-                      }}>
+                      <div className="gp-field-label">Properties</div>
+                      <div className="gp-field-value">
                         {selectedNode.properties.file && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <strong style={{ color: '#9ca3af' }}>File:</strong> {selectedNode.properties.file}
+                          <div style={{ marginBottom: '0.3rem' }}>
+                            <strong style={{ color: 'rgba(148,163,184,0.6)' }}>File:</strong> {selectedNode.properties.file}
                           </div>
                         )}
                         {selectedNode.properties.line && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <strong style={{ color: '#9ca3af' }}>Line:</strong> {selectedNode.properties.line}
+                          <div style={{ marginBottom: '0.3rem' }}>
+                            <strong style={{ color: 'rgba(148,163,184,0.6)' }}>Line:</strong> {selectedNode.properties.line}
                           </div>
                         )}
                         {selectedNode.properties.column && (
-                          <div style={{ marginBottom: '0.5rem' }}>
-                            <strong style={{ color: '#9ca3af' }}>Column:</strong> {selectedNode.properties.column}
+                          <div style={{ marginBottom: '0.3rem' }}>
+                            <strong style={{ color: 'rgba(148,163,184,0.6)' }}>Column:</strong> {selectedNode.properties.column}
                           </div>
                         )}
                         {(selectedNode.properties.value !== null && selectedNode.properties.value !== undefined) && (
                           <div>
-                            <strong style={{ color: '#9ca3af' }}>Value:</strong> {String(selectedNode.properties.value)}
+                            <strong style={{ color: 'rgba(148,163,184,0.6)' }}>Value:</strong> {String(selectedNode.properties.value)}
                           </div>
                         )}
                       </div>
@@ -1143,66 +907,62 @@ function GraphsPage() {
 
                   {selectedVuln && selectedVuln.evidence?.data_flow_path && (
                     <div>
-                      <div style={{ color: '#9ca3af', fontSize: '0.8rem', marginBottom: '0.25rem' }}>In Vulnerability Path</div>
-                      <div style={{
-                        color: selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? '#ef4444' : '#6b7280',
-                        fontSize: '0.9rem',
-                        background: '#1f2937',
-                        padding: '0.5rem',
-                        borderRadius: '4px',
-                        fontWeight: 'bold'
-                      }}>
-                        {selectedVuln.evidence.data_flow_path.includes(selectedNode.id) ? 'Part of vulnerable path' : 'Not in path'}
+                      <div className="gp-field-label">In Vuln Path</div>
+                      <div className={`gp-field-value ${
+                        selectedVuln.evidence.data_flow_path.includes(selectedNode.id)
+                          ? "gp-field-value--path"
+                          : "gp-field-value--nopath"
+                      }`}>
+                        {selectedVuln.evidence.data_flow_path.includes(selectedNode.id)
+                          ? 'Part of vulnerable path'
+                          : 'Not in path'}
                       </div>
                     </div>
                   )}
                 </div>
               </div>
             ) : (
-              <div style={{ color: '#9ca3af', fontSize: '0.9rem' }}>
-                Select a node to see details.
-              </div>
+              <div className="gp-node-empty">Select a node to see details.</div>
             )}
 
-            <div style={{ borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
-              <h4 style={{ margin: 0, color: '#e5e7eb', fontSize: '1rem' }}>Vulnerable Path</h4>
+            <div className="gp-path-section">
+              <h4 className="gp-path-title">Vulnerable Path</h4>
               {selectedVuln?.evidence?.data_flow_path?.length ? (
-                <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <div style={{ color: '#9ca3af', fontSize: '0.85rem' }}>Nodes in order:</div>
-                  <div style={{ background: '#111827', borderRadius: '6px', padding: '0.75rem' }}>
+                <>
+                  <div className="gp-path-box">
                     {selectedVuln.evidence.data_flow_path.map((nodeId, idx) => (
-                      <div key={nodeId} style={{ color: '#e5e7eb', fontSize: '0.85rem', wordBreak: 'break-all' }}>
+                      <div key={nodeId} className="gp-path-item">
                         {idx + 1}. {nodeId}
                       </div>
                     ))}
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
-                    Flow: {selectedVuln.evidence.data_flow_path.join(" -> ")}
+                  <div className="gp-path-flow">
+                    {selectedVuln.evidence.data_flow_path.join(" → ")}
                   </div>
-                </div>
+                </>
               ) : (
-                <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem' }}>
-                  No data flow path available for this vulnerability.
-                </div>
+                <div className="gp-path-empty">No data flow path available.</div>
               )}
             </div>
 
-            <div style={{ borderTop: '1px solid #1f2937', paddingTop: '1rem' }}>
-              <h4 style={{ margin: 0, color: '#e5e7eb', fontSize: '1rem' }}>Report Summary</h4>
+            <div className="gp-summary-section">
+              <h4 className="gp-summary-title">Report Summary</h4>
               {displaySummary ? (
-                <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#cbd5f5', lineHeight: '1.6' }}>
+                <div className="gp-summary-text">
                   <div><strong>Input type:</strong> {displaySummary.input_type || "N/A"}</div>
                   <div><strong>Files scanned:</strong> {displaySummary.files_scanned || 0}/{displaySummary.total_files || 0}</div>
                   <div><strong>Duration:</strong> {durationLabel}</div>
                   <div><strong>Completed:</strong> {displaySummary.completed_at ? new Date(displaySummary.completed_at).toLocaleString() : "N/A"}</div>
-                  <div style={{ marginTop: '0.75rem' }}>
-                    <strong>Total:</strong> {summaryCounts.total} | <strong>Critical:</strong> {summaryCounts.critical} | <strong>High:</strong> {summaryCounts.high} | <strong>Medium:</strong> {summaryCounts.medium} | <strong>Low:</strong> {summaryCounts.low}
+                  <div className="gp-summary-counts">
+                    <strong>Total:</strong> {summaryCounts.total} &nbsp;|&nbsp;
+                    <span style={{ color: '#f87171' }}>C: {summaryCounts.critical}</span> &nbsp;|&nbsp;
+                    <span style={{ color: '#fb923c' }}>H: {summaryCounts.high}</span> &nbsp;|&nbsp;
+                    <span style={{ color: '#facc15' }}>M: {summaryCounts.medium}</span> &nbsp;|&nbsp;
+                    <span style={{ color: '#4ade80' }}>L: {summaryCounts.low}</span>
                   </div>
                 </div>
               ) : (
-                <div style={{ marginTop: '0.5rem', color: '#6b7280', fontSize: '0.85rem' }}>
-                  Run or select a scan to see the report summary.
-                </div>
+                <div className="gp-summary-empty">Run or select a scan to see the summary.</div>
               )}
             </div>
           </div>

@@ -169,15 +169,24 @@ function RepoIntegrationPage() {
   };
 
   if (loading) {
-    return <div className="ri-page">Loading repositories...</div>;
+    return (
+      <div className="ri-page">
+        <div className="ri-cyber-loader">
+          <div className="ri-cyber-loader-bar" />
+          <span>INITIALIZING REPOSITORY LINK...</span>
+        </div>
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="ri-page">
-        <div style={{ color: "#f97373", marginBottom: "1rem" }}>{error}</div>
+        <div style={{ color: "#f97373", marginBottom: "0.5rem", fontSize: "12px", letterSpacing: "1px", textTransform: "uppercase" }}>
+          ⚠ {error}
+        </div>
         <button className="ri-add-btn" onClick={fetchRepositories}>
-          Retry
+          Retry Connection
         </button>
       </div>
     );
@@ -185,10 +194,19 @@ function RepoIntegrationPage() {
 
   return (
     <div className="ri-page">
-      <h1 className="ri-heading">Repository Integration</h1>
+      <h1 className="ri-heading" data-text="Repository Integration">Repository Integration</h1>
       <p className="ri-subheading">
         Connect a GitHub repository or upload a local archive to scan your codebase.
       </p>
+      <div className="ri-cyber-status-bar">
+        <span className="ri-cyber-dot" />
+        <span>SYSTEM ONLINE</span>
+        <span className="ri-cyber-sep">{"//"}</span>
+        <span>{repositories.length} {repositories.length === 1 ? "REPOSITORY" : "REPOSITORIES"} LINKED</span>
+        <span className="ri-cyber-sep">{"//"}</span>
+        <span>SECURE CHANNEL ACTIVE</span>
+      </div>
+
       {pageMessage && <div className="acct-error" style={{ marginBottom: "1rem" }}>{pageMessage}</div>}
 
       <div className="ri-shell">
@@ -198,7 +216,7 @@ function RepoIntegrationPage() {
             className="ri-add-btn"
             onClick={() => setShowAddModal(true)}
           >
-            Add New Repository
+            + Link Repository
           </button>
         </div>
 

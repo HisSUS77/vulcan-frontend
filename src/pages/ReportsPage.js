@@ -300,18 +300,30 @@ export default function ReportsPage() {
   }, [vulnerabilities, patchFilter, patchSearch]);
 
   if (loading) {
-    return <div className="rp6-page">Loading reports...</div>;
+    return (
+      <div className="rp6-page">
+        <div className="rp6-cyber-loader">
+          <div className="rp6-cyber-loader-bar" />
+          <span>LOADING REPORT DATA...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="rp6-page">
       <div className="rp6-hero">
         <div>
-          <h1 className="rp6-title">Reports & Patch Insights</h1>
-          <p className="rp6-subtitle">
-            Unified vulnerability reporting with patch intelligence.
-            {refreshing && <span className="rp6-refreshing">Syncing…</span>}
-          </p>
+          <h1 className="rp6-title" data-text="Reports & Patch Insights">Reports & Patch Insights</h1>
+          <div className="rp6-cyber-status">
+            <span className="rp6-cyber-dot" />
+            <span>ANALYSIS ACTIVE</span>
+            <span className="rp6-cyber-sep">{"//"}</span>
+            <span>{filteredVulnerabilities.length} VULNERABILITIES</span>
+            <span className="rp6-cyber-sep">{"//"}</span>
+            <span>{scans.length} {scans.length === 1 ? "SCAN" : "SCANS"} LOADED</span>
+            {refreshing && <><span className="rp6-cyber-sep">{"//"}</span><span>SYNCING…</span></>}
+          </div>
         </div>
         <div className="rp6-exports">
           <button className="rp6-btn" onClick={handleExportJSON} disabled={!filteredVulnerabilities.length}>

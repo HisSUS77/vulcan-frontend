@@ -212,7 +212,7 @@ function DashboardPage() {
 
   return (
     <div className="v-dashboard">
-      <h1 className="ri-heading">Dashboard</h1>
+      <h1 className="ri-heading" data-text="Dashboard">Dashboard</h1>
       <p className="ri-subheading">
         Overview of scans, vulnerabilities, and patch performance.
       </p>

@@ -107,6 +107,10 @@ function AppLayout({ children }) {
 
   return (
     <div className="v-layout">
+      {/* Cyber background overlays — purely decorative, pointer-events: none */}
+      <div className="v-grid-overlay" aria-hidden="true" />
+      <div className="v-scanline-overlay" aria-hidden="true" />
+
       {invalidToken && (
         <div className="v-invalid-token-overlay" role="alert" aria-live="assertive">
           <div className="v-invalid-token-card">

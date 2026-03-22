@@ -345,10 +345,8 @@ function ScanPage() {
       {toast && <div className="vs-toast">{toast}</div>}
 
       {resumeScanId && !scanning && (
-        <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0b1220", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            Resume in-progress scan: <strong>{resumeScanId}</strong> - {resumeStatus}
-          </div>
+        <div className="vs-resume-banner">
+          <div>RESUME IN-PROGRESS SCAN: <strong>{resumeScanId}</strong> — {resumeStatus}</div>
           <button
             type="button"
             className="vs-view-graph-btn"
@@ -364,12 +362,10 @@ function ScanPage() {
       )}
 
       {!scanning && currentScanId && scanSummary && (
-        <div style={{ margin: "0 0 1rem 0", padding: "0.75rem 1rem", background: "#0f172a", border: "1px solid #1f2937", borderRadius: "10px", color: "#cbd5f5", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            Last scan: <strong>{currentScanId}</strong> - {scanSummary.vulnerabilities_found || 0} vulns
-          </div>
+        <div className="vs-resume-banner">
+          <div>LAST SCAN: <strong>{currentScanId}</strong> — {scanSummary.vulnerabilities_found || 0} VULNS DETECTED</div>
           <button type="button" className="vs-view-graph-btn" onClick={handleViewGraph}>
-            View last graph
+            View Last Graph
           </button>
         </div>
       )}
@@ -395,7 +391,13 @@ function ScanPage() {
               />
             </svg>
           </div>
-          <div className="vs-header-title">VULNERABILITY SCAN</div>
+          <div className="vs-header-title" data-text="VULNERABILITY SCAN">VULNERABILITY SCAN</div>
+          <div className="vs-header-status">
+            <span className="vs-header-status-dot" />
+            <span>SECURE SCAN PROTOCOL ACTIVE</span>
+            <span style={{ opacity: 0.4 }}>{"//"}</span>
+            <span>{scanning ? "SCANNING IN PROGRESS" : "AWAITING TARGET"}</span>
+          </div>
         </div>
       </div>
 
@@ -541,16 +543,7 @@ function ScanPage() {
                         Clear
                       </button>
                     </div>
-                    <div
-                      style={{
-                        border: "1px solid #2b2f3a",
-                        borderRadius: "8px",
-                        padding: "0.5rem",
-                        maxHeight: "220px",
-                        overflow: "auto",
-                        background: "#0f1117",
-                      }}
-                    >
+                    <div className="vs-file-list" style={{ padding: "0.5rem", maxHeight: "220px", overflow: "auto" }}>
                       {repoFilesLoading && <div style={{ color: "#999" }}>Loading files...</div>}
                       {repoFilesError && <div style={{ color: "#f97373" }}>{repoFilesError}</div>}
                       {!repoFilesLoading && !repoFilesError && repoFiles.length === 0 && (
@@ -622,7 +615,7 @@ function ScanPage() {
             <div className="vs-row-start">
               <button
                 type="button"
-                className="vs-start-btn"
+                className={`vs-start-btn${scanning ? " vs-scanning" : ""}`}
                 onClick={handleStartScan}
               >
                 {scanning ? "SCANNING..." : "START SCAN"}
