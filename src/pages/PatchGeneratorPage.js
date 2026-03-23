@@ -115,9 +115,11 @@ export default function PatchGeneratorPage() {
   if (!activeScanId) {
     return (
       <div className="v-placeholder-page">
-        <p>No scan selected for patch generation.</p>
+        <p style={{ fontFamily: "var(--font-mono)", color: "rgba(34,211,238,0.6)", letterSpacing: "0.12em", fontSize: "13px" }}>
+          NO TARGET LOADED — PATCH FORGE IDLE
+        </p>
         <button className="v-secondary-btn" onClick={() => navigate("/scan")}>
-          Start a scan
+          Initialize Scan
         </button>
       </div>
     );
@@ -193,24 +195,31 @@ export default function PatchGeneratorPage() {
 
       <div className="pg6-hero">
         <div className="pg6-hero-left">
-          <h1 className="pg6-title">Automated Patch Generation</h1>
+          <div className="pg6-kicker">PATCH FORGE // PG-06</div>
+          <h1 className="pg6-title" data-text="Automated Patch Generation">Automated Patch Generation</h1>
           <p className="pg6-subtitle">
             Generate verified patches with diff-only output, validation signals,
             and apply-ready metadata.
           </p>
           <div className="pg6-scan-pill">
-            Scan ID <span>{activeScanId}</span>
+            SCAN ID <span>{activeScanId}</span>
           </div>
         </div>
         <div className="pg6-hero-right">
           <button
-            className="pg6-primary"
+            className={`pg6-primary${loading ? " pg6-generating" : ""}`}
             onClick={handleGeneratePatch}
             disabled={loading || !selectedVuln}
           >
-            {loading ? "Generating..." : "Generate Patch"}
+            {loading ? "FORGING PATCH..." : "FORGE PATCH"}
           </button>
-          <div className="pg6-primary-hint">Diff-only output, no repo edits.</div>
+          {loading && (
+            <div className="pg6-forge-loader">
+              <div className="pg6-forge-loader-bar" />
+              <span className="pg6-forge-loader-text">SYNTHESIZING</span>
+            </div>
+          )}
+          <div className="pg6-primary-hint">Diff-only output · no repo edits.</div>
         </div>
       </div>
 
@@ -351,7 +360,7 @@ export default function PatchGeneratorPage() {
               </div>
             </div>
           </div>
-          <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+          <div className="pg6-diff-copy-row">
             <button
               className="pg6-copy-btn"
               onClick={() => copyToClipboard(selectedPatch?.unified_diff || "")}
