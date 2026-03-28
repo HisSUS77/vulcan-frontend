@@ -21,6 +21,7 @@ export const authService = {
 export const dashboardService = {
   getSummary: () => api.get("/dashboard/summary"),
   getRecentScans: () => api.get("/dashboard/recent-scans"),
+  getPatchStats: () => api.get("/dashboard/patch-stats"),
 };
 
 // ============= NOTIFICATIONS =============
