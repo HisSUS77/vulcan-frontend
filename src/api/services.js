@@ -84,6 +84,12 @@ export const patchService = {
       params: repoId ? { repo_id: repoId } : {},
     }),
   export: (patchId) => api.get(`/patches/${patchId}/export`),
+  // FR-M6.10: Review workflow
+  approve: (patchId) => api.post(`/patches/${patchId}/approve`),
+  reject: (patchId) => api.post(`/patches/${patchId}/reject`),
+  // FE-5: Patch history / audit trail
+  historyForVuln: (vulnerabilityId) =>
+    api.get(`/patches/vulnerability/${vulnerabilityId}/history`),
 };
 
 // ============= REPORTS =============
