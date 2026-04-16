@@ -8304,3 +8304,201 @@ select option:hover {
 /* ============================================================
    END AI PATCH SUCCESS RATE CARD
    ============================================================ */
+
+/* ============================================================
+   ADVERSARIAL ATTACK SIMULATION PANEL — pg6-attack-*
+   ============================================================ */
+
+.pg6-attack-panel {
+  margin-top: 20px;
+  background: radial-gradient(600px 180px at 10% 0%, rgba(239,68,68,0.06), transparent 60%), #020617;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 14px;
+  padding: 18px 20px;
+  animation: v-fade-up 0.5s ease both;
+}
+
+.pg6-attack-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pg6-attack-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.pg6-attack-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #9ca3af;
+  flex: 1;
+}
+
+/* Overall verdict badge */
+.pg6-attack-verdict {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+.pg6-attack-verdict.secure {
+  background: rgba(34,197,94,0.12);
+  border: 1px solid rgba(34,197,94,0.35);
+  color: #22c55e;
+}
+.pg6-attack-verdict.vulnerable {
+  background: rgba(239,68,68,0.12);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #ef4444;
+}
+.pg6-attack-verdict-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.secure  .pg6-attack-verdict-dot { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+.vulnerable .pg6-attack-verdict-dot { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+
+/* Confidence bar */
+.pg6-attack-conf-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.pg6-attack-conf-label {
+  font-size: 10px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.pg6-attack-conf-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pg6-attack-conf-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s ease;
+}
+.pg6-attack-conf-fill.high   { background: linear-gradient(90deg, #16a34a, #22c55e); }
+.pg6-attack-conf-fill.medium { background: linear-gradient(90deg, #d97706, #f59e0b); }
+.pg6-attack-conf-fill.low    { background: linear-gradient(90deg, #b91c1c, #ef4444); }
+.pg6-attack-conf-val {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  min-width: 36px;
+  text-align: right;
+}
+.pg6-attack-conf-val.high   { color: #22c55e; }
+.pg6-attack-conf-val.medium { color: #f59e0b; }
+.pg6-attack-conf-val.low    { color: #ef4444; }
+
+/* Attack attempts grid */
+.pg6-attack-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pg6-attack-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.05);
+  background: rgba(255,255,255,0.02);
+  transition: background 0.15s;
+}
+.pg6-attack-row:hover {
+  background: rgba(255,255,255,0.04);
+}
+.pg6-attack-row.blocked   { border-left: 3px solid #22c55e; }
+.pg6-attack-row.bypassed  { border-left: 3px solid #ef4444; }
+
+.pg6-attack-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-top: 1px;
+}
+.pg6-attack-badge.blocked  {
+  background: rgba(34,197,94,0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,0.3);
+}
+.pg6-attack-badge.bypassed {
+  background: rgba(239,68,68,0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.3);
+}
+
+.pg6-attack-info { flex: 1; min-width: 0; }
+.pg6-attack-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 2px;
+}
+.pg6-attack-reason {
+  font-size: 10px;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+/* Recommendation */
+.pg6-attack-rec {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(59,130,246,0.06);
+  border: 1px solid rgba(59,130,246,0.15);
+  border-radius: 8px;
+  font-size: 11px;
+  color: #93c5fd;
+  line-height: 1.5;
+}
+.pg6-attack-rec-icon { flex-shrink: 0; margin-top: 1px; }
+
+/* Loading skeleton */
+.pg6-attack-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  color: #6b7280;
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+.pg6-attack-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.1);
+  border-top-color: #ef4444;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ============================================================
+   END ADVERSARIAL ATTACK SIMULATION PANEL
+   ============================================================ */

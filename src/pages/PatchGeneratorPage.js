@@ -31,6 +31,69 @@ const buildDiffRows = (diffText) => {
   return { left, right };
 };
 
+/* ── AttackSimulationPanel ──────────────────────────────────────────────── */
+function AttackSimulationPanel({ attackTest }) {
+  if (!attackTest) return null;
+
+  const { overall_secure, patch_confidence, attacks, recommendation } = attackTest;
+  const pct = Math.min(100, Math.max(0, patch_confidence ?? 0));
+  const confClass = pct >= 75 ? "high" : pct >= 50 ? "medium" : "low";
+
+  return (
+    <div className="pg6-attack-panel">
+      {/* Header row */}
+      <div className="pg6-attack-header">
+        <span className="pg6-attack-icon">🛡</span>
+        <span className="pg6-attack-title">Adversarial Attack Simulation</span>
+        <span className={`pg6-attack-verdict ${overall_secure ? "secure" : "vulnerable"}`}>
+          <span className="pg6-attack-verdict-dot" />
+          {overall_secure ? "PATCH HELD" : "BYPASS DETECTED"}
+        </span>
+      </div>
+
+      {/* Confidence bar */}
+      <div className="pg6-attack-conf-row">
+        <span className="pg6-attack-conf-label">Attacker's patch confidence</span>
+        <div className="pg6-attack-conf-track">
+          <div
+            className={`pg6-attack-conf-fill ${confClass}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`pg6-attack-conf-val ${confClass}`}>{pct}%</span>
+      </div>
+
+      {/* Attack attempts */}
+      {attacks && attacks.length > 0 && (
+        <div className="pg6-attack-grid">
+          {attacks.map((atk, i) => {
+            const blocked = (atk.result || "").toUpperCase() === "BLOCKED";
+            return (
+              <div key={i} className={`pg6-attack-row ${blocked ? "blocked" : "bypassed"}`}>
+                <span className={`pg6-attack-badge ${blocked ? "blocked" : "bypassed"}`}>
+                  {blocked ? "BLOCKED" : "BYPASSED"}
+                </span>
+                <div className="pg6-attack-info">
+                  <div className="pg6-attack-name">{atk.name}</div>
+                  <div className="pg6-attack-reason">{atk.explanation}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Recommendation */}
+      {recommendation && (
+        <div className="pg6-attack-rec">
+          <span className="pg6-attack-rec-icon">💡</span>
+          <span>{recommendation}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── component ───────────────────────────────────────────────────────── */
 export default function PatchGeneratorPage() {
   const [searchParams] = useSearchParams();
@@ -281,7 +344,7 @@ export default function PatchGeneratorPage() {
             <div className="pg6-forge-loader">
               <div className="pg6-forge-loader-bar" />
               <span className="pg6-forge-loader-text">
-                SYNTHESIZING · LLM ACTIVE · CoT REASONING
+                SYNTHESIZING · 4-PHASE CoT · ATTACK SIMULATION
               </span>
             </div>
           )}
@@ -566,6 +629,23 @@ export default function PatchGeneratorPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Adversarial Attack Simulation ── */}
+      {selectedPatch?.attack_test && (
+        <AttackSimulationPanel attackTest={selectedPatch.attack_test} />
+      )}
+      {loading && (
+        <div className="pg6-attack-panel">
+          <div className="pg6-attack-header">
+            <span className="pg6-attack-icon">🛡</span>
+            <span className="pg6-attack-title">Adversarial Attack Simulation</span>
+          </div>
+          <div className="pg6-attack-loading">
+            <div className="pg6-attack-spinner" />
+            RUNNING ATTACK SIMULATION · TESTING PATCH AGAINST 5 BYPASS TECHNIQUES…
+          </div>
+        </div>
+      )}
 
       {/* ── Patch History Log (FE-5, FR-M6.8) ── */}
       {patches.length > 0 && (
