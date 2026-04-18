@@ -20,6 +20,9 @@ function OAuthCallbackPage() {
         navigate("/login", { replace: true });
         return;
       }
+      localStorage.removeItem("pg_selectedVuln");
+      localStorage.removeItem("pg_patches");
+      localStorage.removeItem("pg_selectedPatch");
       setAccessToken(token);
       try {
         const me = await authService.me();

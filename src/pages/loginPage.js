@@ -46,6 +46,10 @@ function LoginPage() {
         password: form.password,
       });
       if (data?.access_token) {
+        // Clear patch page state so each login starts fresh
+        localStorage.removeItem("pg_selectedVuln");
+        localStorage.removeItem("pg_patches");
+        localStorage.removeItem("pg_selectedPatch");
         setAccessToken(data.access_token);
         try {
           const me = await authService.me();
