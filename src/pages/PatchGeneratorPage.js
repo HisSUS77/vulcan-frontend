@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { patchService, reportService, scanService } from "../api/services";
+import { patchService, reportService, scanService, sandboxService } from "../api/services";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const severityClass = (sev = "") =>
@@ -32,12 +32,31 @@ const buildDiffRows = (diffText) => {
 };
 
 /* ── AttackSimulationPanel ──────────────────────────────────────────────── */
-function AttackSimulationPanel({ attackTest }) {
+function AttackSimulationPanel({ attackTest, patchId }) {
+  const [testResults, setTestResults] = useState({});   // attackName → { loading, verdict, stdout, stderr, error }
   if (!attackTest) return null;
 
   const { overall_secure, patch_confidence, attacks, recommendation } = attackTest;
   const pct = Math.min(100, Math.max(0, patch_confidence ?? 0));
   const confClass = pct >= 75 ? "high" : pct >= 50 ? "medium" : "low";
+
+  const handleTest = async (atk) => {
+    if (!patchId) return;
+    setTestResults(prev => ({ ...prev, [atk.name]: { loading: true } }));
+    try {
+      const res = await sandboxService.runAttackTest(patchId, atk.name, atk.technique || atk.name);
+      const d = res.data;
+      setTestResults(prev => ({
+        ...prev,
+        [atk.name]: { loading: false, verdict: d.verdict, stdout: d.stdout, stderr: d.stderr, timed_out: d.timed_out, error: d.error },
+      }));
+    } catch (err) {
+      setTestResults(prev => ({
+        ...prev,
+        [atk.name]: { loading: false, verdict: "ERROR", error: err?.response?.data?.detail || err.message },
+      }));
+    }
+  };
 
   return (
     <div className="pg6-attack-panel">
@@ -67,7 +86,9 @@ function AttackSimulationPanel({ attackTest }) {
       {attacks && attacks.length > 0 && (
         <div className="pg6-attack-grid">
           {attacks.map((atk, i) => {
-            const blocked = (atk.result || "").toUpperCase() === "BLOCKED";
+            const blocked  = (atk.result || "").toUpperCase() === "BLOCKED";
+            const tr       = testResults[atk.name] || {};
+            const verdict  = tr.verdict;
             return (
               <div key={i} className={`pg6-attack-row ${blocked ? "blocked" : "bypassed"}`}>
                 <span className={`pg6-attack-badge ${blocked ? "blocked" : "bypassed"}`}>
@@ -76,7 +97,27 @@ function AttackSimulationPanel({ attackTest }) {
                 <div className="pg6-attack-info">
                   <div className="pg6-attack-name">{atk.name}</div>
                   <div className="pg6-attack-reason">{atk.explanation}</div>
+                  {/* Sandbox live result */}
+                  {verdict && (
+                    <div className={`pg6-attack-sandbox-result ${verdict.toLowerCase()}`}>
+                      <span className="pg6-attack-sandbox-label">SANDBOX:</span>
+                      <span className={`pg6-attack-sandbox-verdict ${verdict.toLowerCase()}`}>{verdict}</span>
+                      {tr.stdout && <pre className="pg6-attack-sandbox-out">{tr.stdout.slice(0, 300)}</pre>}
+                      {tr.stderr && !tr.stdout && <pre className="pg6-attack-sandbox-out err">{tr.stderr.slice(0, 200)}</pre>}
+                      {tr.error  && <span className="pg6-attack-sandbox-err">{tr.error}</span>}
+                    </div>
+                  )}
                 </div>
+                {patchId && (
+                  <button
+                    className="pg6-attack-test-btn"
+                    onClick={() => handleTest(atk)}
+                    disabled={tr.loading}
+                    title="Run this attack in the sandbox against the patched code"
+                  >
+                    {tr.loading ? "…" : "▶ SANDBOX"}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -109,9 +150,22 @@ export default function PatchGeneratorPage() {
   const [selectedVuln, setSelectedVuln]       = useState("");
   const [selectedVulnData, setSelectedVulnData] = useState(null);
   const [patches, setPatches]                 = useState([]);
-  const [selectedPatch, setSelectedPatch]     = useState(null);
+  const [selectedPatch, setSelectedPatch]     = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pg_selectedPatch") || "null"); }
+    catch { return null; }
+  });
   const [loading, setLoading]                 = useState(false);
   const [reviewLoading, setReviewLoading]     = useState(false);
+  const [verifyResult, setVerifyResult]       = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pg_verifyResult") || "null"); }
+    catch { return null; }
+  });
+  const [verifyLoading, setVerifyLoading]     = useState(false);
+  const [sandboxResult, setSandboxResult]     = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pg_sandboxResult") || "null"); }
+    catch { return null; }
+  });
+  const [sandboxLoading, setSandboxLoading]   = useState(false);
   const [historyOpen, setHistoryOpen]         = useState(false);
   const [toast, setToast]                     = useState({ msg: "", type: "ok" });
 
@@ -167,13 +221,37 @@ export default function PatchGeneratorPage() {
 
   useEffect(() => { fetchVulnerabilities(); }, [fetchVulnerabilities]);
 
-  /* keep selectedVulnData in sync */
+  /* persist patch session to localStorage */
+  useEffect(() => {
+    if (selectedPatch) localStorage.setItem("pg_selectedPatch", JSON.stringify(selectedPatch));
+    else localStorage.removeItem("pg_selectedPatch");
+  }, [selectedPatch]);
+  useEffect(() => {
+    if (verifyResult) localStorage.setItem("pg_verifyResult", JSON.stringify(verifyResult));
+    else localStorage.removeItem("pg_verifyResult");
+  }, [verifyResult]);
+  useEffect(() => {
+    if (sandboxResult) localStorage.setItem("pg_sandboxResult", JSON.stringify(sandboxResult));
+    else localStorage.removeItem("pg_sandboxResult");
+  }, [sandboxResult]);
+
+  /* keep selectedVulnData in sync — do NOT auto-clear patch on vuln change */
   useEffect(() => {
     const v = vulnerabilities.find((x) => x.id === selectedVuln);
     setSelectedVulnData(v || null);
+  }, [selectedVuln, vulnerabilities]);
+
+  /* clear patch session — called by the Clear button */
+  const handleClearPatch = () => {
     setPatches([]);
     setSelectedPatch(null);
-  }, [selectedVuln, vulnerabilities]);
+    setVerifyResult(null);
+    setSandboxResult(null);
+    localStorage.removeItem("pg_selectedPatch");
+    localStorage.removeItem("pg_verifyResult");
+    localStorage.removeItem("pg_sandboxResult");
+    showToast("PATCH CLEARED", "ok");
+  };
 
   /* ── actions ── */
   const handleGeneratePatch = async (isRegen = false) => {
@@ -251,6 +329,31 @@ export default function PatchGeneratorPage() {
       showToast("PATCH APPROVED ✓", "ok");
     } catch { showToast("APPROVE FAILED", "err"); }
     finally { setReviewLoading(false); }
+  };
+
+  const handleVerifyPatch = async () => {
+    if (!selectedPatch || verifyLoading) return;
+    setVerifyLoading(true);
+    setVerifyResult(null);
+    try {
+      const res = await patchService.verify(selectedPatch.patch_id);
+      setVerifyResult(res.data);
+      showToast(res.data.fixed ? "✓ VULNERABILITY CONFIRMED FIXED" : "⚠ VULNERABILITY STILL PRESENT", res.data.fixed ? "ok" : "err");
+    } catch { showToast("Verification failed", "err"); }
+    finally { setVerifyLoading(false); }
+  };
+
+  const handleRunSandbox = async () => {
+    const pocCode = selectedPatch?.exploit?.poc_code || selectedVulnData?.exploit?.poc_code;
+    if (!pocCode) { showToast("No PoC code available for this finding", "err"); return; }
+    setSandboxLoading(true);
+    setSandboxResult(null);
+    try {
+      const res = await sandboxService.run(pocCode, "python", selectedPatch?.vuln_type || "unknown");
+      setSandboxResult(res.data);
+      showToast(res.data.confirmed ? "⚡ EXPLOIT CONFIRMED IN SANDBOX" : "NOT CONFIRMED IN SANDBOX", res.data.confirmed ? "err" : "ok");
+    } catch { showToast("Sandbox execution failed", "err"); }
+    finally { setSandboxLoading(false); }
   };
 
   const handleRejectPatch = async () => {
@@ -340,6 +443,15 @@ export default function PatchGeneratorPage() {
               ↺ REGEN ALT
             </button>
           )}
+          {selectedPatch && (
+            <button
+              className="pg6-clear-btn"
+              onClick={handleClearPatch}
+              title="Clear current patch and start fresh"
+            >
+              ✕ CLEAR PATCH
+            </button>
+          )}
           {loading && (
             <div className="pg6-forge-loader">
               <div className="pg6-forge-loader-bar" />
@@ -378,6 +490,54 @@ export default function PatchGeneratorPage() {
           </div>
         </div>
       )}
+
+      {/* ── Exploit PoC Card ── */}
+      {(() => {
+        const ex = selectedVulnData?.exploit;
+        if (!ex) return null;
+        return (
+          <div className={`pg6-exploit-card ${ex.exploitable ? "exploitable" : "not-exploitable"}`}>
+            <div className="pg6-exploit-header">
+              <span className="pg6-exploit-icon">⚡</span>
+              <span className="pg6-exploit-title">Exploit PoC — Auto-Generated</span>
+              <span className={`pg6-exploit-verdict ${ex.exploitable ? "exploitable" : "not-exploitable"}`}>
+                {ex.exploitable ? "CONFIRMED EXPLOITABLE" : "NOT EXPLOITABLE AS WRITTEN"}
+              </span>
+              <span className="pg6-exploit-conf">{Math.round((ex.confidence || 0) * 100)}%</span>
+            </div>
+            <div className="pg6-exploit-meta">
+              {ex.exploit_type    && <div><span>Type</span>{ex.exploit_type}</div>}
+              {ex.attack_vector   && <div><span>Attack vector</span>{ex.attack_vector}</div>}
+              {ex.impact          && <div><span>Impact</span>{ex.impact}</div>}
+            </div>
+            {ex.bypass_hints && (() => {
+              const hints = Array.isArray(ex.bypass_hints)
+                ? ex.bypass_hints
+                : String(ex.bypass_hints).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+              return hints.length > 0 ? (
+                <div className="pg6-exploit-hints">
+                  <div className="pg6-exploit-hints-label">Bypass hints</div>
+                  {hints.map((h, i) => <span key={i} className="pg6-exploit-hint-tag">{h}</span>)}
+                </div>
+              ) : null;
+            })()}
+            {ex.poc_code && (
+              <div className="pg6-exploit-poc">
+                <div className="pg6-exploit-poc-header">
+                  <span className="pg6-exploit-poc-label">Proof-of-Concept Code</span>
+                  <button
+                    className="pg6-copy-btn"
+                    onClick={() => copyToClipboard(ex.poc_code)}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <pre className="pg6-exploit-pre">{ex.poc_code}</pre>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Main grid ── */}
       <div className="pg6-grid">
@@ -437,6 +597,20 @@ export default function PatchGeneratorPage() {
             </button>
             <button className="pg6-secondary" onClick={handleApplyPatch} disabled={!selectedPatch}>
               Apply Branch
+            </button>
+            <button
+              className="pg6-verify-btn"
+              onClick={handleVerifyPatch}
+              disabled={!selectedPatch || verifyLoading}
+            >
+              {verifyLoading ? "Verifying…" : "⟳ Verify Fix"}
+            </button>
+            <button
+              className="pg6-sandbox-btn"
+              onClick={handleRunSandbox}
+              disabled={sandboxLoading}
+            >
+              {sandboxLoading ? "Running…" : "▶ Run in Sandbox"}
             </button>
           </div>
 
@@ -632,7 +806,7 @@ export default function PatchGeneratorPage() {
 
       {/* ── Adversarial Attack Simulation ── */}
       {selectedPatch?.attack_test && (
-        <AttackSimulationPanel attackTest={selectedPatch.attack_test} />
+        <AttackSimulationPanel attackTest={selectedPatch.attack_test} patchId={selectedPatch.patch_id} />
       )}
       {loading && (
         <div className="pg6-attack-panel">
@@ -644,6 +818,101 @@ export default function PatchGeneratorPage() {
             <div className="pg6-attack-spinner" />
             RUNNING ATTACK SIMULATION · TESTING PATCH AGAINST 5 BYPASS TECHNIQUES…
           </div>
+        </div>
+      )}
+
+      {/* ── Fix Verification Result ── */}
+      {verifyResult && (
+        <div className={`pg6-verify-panel ${verifyResult.fixed ? "pg6-verify-panel--fixed" : "pg6-verify-panel--unfixed"}`}>
+          <div className="pg6-verify-header">
+            <span className="pg6-verify-icon">{verifyResult.fixed ? "✓" : "✗"}</span>
+            <span className="pg6-verify-title">Fix Verification Result</span>
+            <span className={`pg6-verify-verdict ${verifyResult.fixed ? "fixed" : "unfixed"}`}>
+              {verifyResult.fixed ? "VULNERABILITY ELIMINATED" : "VULNERABILITY PERSISTS"}
+            </span>
+          </div>
+          <div className="pg6-verify-grid">
+            <div className="pg6-verify-stat">
+              <div className="pg6-verify-stat-val">{verifyResult.original_vuln_type || "—"}</div>
+              <div className="pg6-verify-stat-label">Original Vuln Type</div>
+            </div>
+            <div className="pg6-verify-stat">
+              <div className="pg6-verify-stat-val">{verifyResult.remaining_vulns?.length ?? 0}</div>
+              <div className="pg6-verify-stat-label">Remaining Vulns</div>
+            </div>
+            <div className="pg6-verify-stat">
+              <div className={`pg6-verify-stat-val ${verifyResult.new_vulns?.length ? "warn" : ""}`}>
+                {verifyResult.new_vulns?.length ?? 0}
+              </div>
+              <div className="pg6-verify-stat-label">New Vulns Introduced</div>
+            </div>
+            <div className="pg6-verify-stat">
+              <div className="pg6-verify-stat-val">{verifyResult.patched_code_lines ?? "—"}</div>
+              <div className="pg6-verify-stat-label">Patched Code Lines</div>
+            </div>
+          </div>
+          {verifyResult.remaining_vulns?.length > 0 && (
+            <div className="pg6-verify-remaining">
+              <div className="pg6-verify-remaining-label">Still detected:</div>
+              {verifyResult.remaining_vulns.map((v, i) => (
+                <span key={i} className="pg6-verify-vuln-tag">{v}</span>
+              ))}
+            </div>
+          )}
+          {verifyResult.new_vulns?.length > 0 && (
+            <div className="pg6-verify-new-vulns">
+              <div className="pg6-verify-remaining-label">⚠ New issues introduced:</div>
+              {verifyResult.new_vulns.map((v, i) => (
+                <span key={i} className="pg6-verify-vuln-tag pg6-verify-vuln-tag--new">{v}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Exploit Sandbox Terminal ── */}
+      {(sandboxResult || sandboxLoading) && (
+        <div className="pg6-sandbox-panel">
+          <div className="pg6-sandbox-header">
+            <span className="pg6-sandbox-icon">⬡</span>
+            <span className="pg6-sandbox-title">Exploit Sandbox — Isolated Execution</span>
+            {sandboxResult && (
+              <span className={`pg6-sandbox-verdict ${sandboxResult.confirmed ? "confirmed" : sandboxResult.timed_out ? "timeout" : "not-confirmed"}`}>
+                {sandboxResult.confirmed ? "⚡ EXPLOIT CONFIRMED" : sandboxResult.timed_out ? "⏱ SANDBOX TIMEOUT" : "NOT EXPLOITABLE"}
+              </span>
+            )}
+          </div>
+          {sandboxLoading && (
+            <div className="pg6-sandbox-loading">
+              <div className="pg6-sandbox-spinner" />
+              <span>EXECUTING IN ISOLATED CONTAINER · --network none · --read-only…</span>
+            </div>
+          )}
+          {sandboxResult && (
+            <div className="pg6-sandbox-body">
+              <div className="pg6-sandbox-meta-row">
+                <span className={`pg6-sandbox-exit ${sandboxResult.exit_code === 0 ? "ok" : "bad"}`}>
+                  EXIT {sandboxResult.exit_code ?? "—"}
+                </span>
+                {sandboxResult.timed_out && <span className="pg6-sandbox-timeout">TIMED OUT</span>}
+              </div>
+              {sandboxResult.stdout && (
+                <div className="pg6-sandbox-stream">
+                  <div className="pg6-sandbox-stream-label">STDOUT</div>
+                  <pre className="pg6-sandbox-pre">{sandboxResult.stdout}</pre>
+                </div>
+              )}
+              {sandboxResult.stderr && (
+                <div className="pg6-sandbox-stream">
+                  <div className="pg6-sandbox-stream-label pg6-sandbox-stream-label--err">STDERR</div>
+                  <pre className="pg6-sandbox-pre pg6-sandbox-pre--err">{sandboxResult.stderr}</pre>
+                </div>
+              )}
+              {sandboxResult.error && (
+                <div className="pg6-sandbox-error">{sandboxResult.error}</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

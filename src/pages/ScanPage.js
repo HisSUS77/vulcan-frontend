@@ -35,6 +35,11 @@ function ScanPage() {
   const lineCountColor = lineCount > 390 ? "#f97373" : lineCount > 360 ? "#f59e0b" : "#888";
   const [resumeScanId, setResumeScanId] = useState(null);
   const [resumeStatus, setResumeStatus] = useState("");
+  const [diffBase, setDiffBase]         = useState("main");
+  const [diffHead, setDiffHead]         = useState("HEAD");
+  const [diffFiles, setDiffFiles]       = useState([]);
+  const [diffLoading, setDiffLoading]   = useState(false);
+  const [diffFetched, setDiffFetched]   = useState(false);
 
   useEffect(() => {
     if (currentScanId || scanning) return;
@@ -250,7 +255,7 @@ function ScanPage() {
         setToast("Please select a repository.");
         return;
       }
-      if (scanScope === "selected" && selectedFiles.length === 0) {
+      if ((scanScope === "selected" || scanScope === "diff") && selectedFiles.length === 0) {
         setToast("Please select at least one file to scan.");
         return;
       }
@@ -273,7 +278,7 @@ function ScanPage() {
           branch: branch,
           scan_mode: scanMode.toUpperCase(),
         };
-        if (scanScope === "selected" && selectedFiles.length > 0) {
+        if ((scanScope === "selected" || scanScope === "diff") && selectedFiles.length > 0) {
           scanData.file_paths = selectedFiles;
         }
       }
@@ -327,6 +332,25 @@ function ScanPage() {
 
   const handleClearFiles = () => {
     setSelectedFiles([]);
+  };
+
+  const handleFetchDiff = async () => {
+    if (!repository) { setToast("Select a repository first."); return; }
+    setDiffLoading(true);
+    setDiffFiles([]);
+    setDiffFetched(false);
+    try {
+      const res = await scanService.getDiffFiles(repository, diffBase, diffHead);
+      const files = res.data?.changed_files || [];
+      setDiffFiles(files);
+      setSelectedFiles(files);
+      setDiffFetched(true);
+      if (!files.length) setToast("No changed source files between those refs.");
+    } catch (err) {
+      setToast(err.response?.data?.detail || "Failed to fetch diff.");
+    } finally {
+      setDiffLoading(false);
+    }
   };
 
   const handleViewGraph = () => {
@@ -521,6 +545,13 @@ function ScanPage() {
                     >
                       Select files
                     </button>
+                    <button
+                      type="button"
+                      className={"vs-mode-btn" + (scanScope === "diff" ? " active" : "")}
+                      onClick={() => { setScanScope("diff"); setDiffFiles([]); setDiffFetched(false); }}
+                    >
+                      ⊕ Diff scan
+                    </button>
                   </div>
                 </div>
 
@@ -572,6 +603,67 @@ function ScanPage() {
                           </label>
                         ))}
                     </div>
+                  </div>
+                )}
+
+                {scanScope === "diff" && (
+                  <div className="vs-diff-panel">
+                    <div className="vs-diff-panel-title">⊕ DIFF-BASED SCAN — only changed files</div>
+                    <div className="vs-diff-refs">
+                      <div className="vs-field">
+                        <div className="vs-label">Base ref</div>
+                        <input
+                          className="vs-select"
+                          value={diffBase}
+                          onChange={(e) => setDiffBase(e.target.value)}
+                          placeholder="main"
+                        />
+                      </div>
+                      <div className="vs-diff-arrow">→</div>
+                      <div className="vs-field">
+                        <div className="vs-label">Head ref</div>
+                        <input
+                          className="vs-select"
+                          value={diffHead}
+                          onChange={(e) => setDiffHead(e.target.value)}
+                          placeholder="HEAD"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="vs-save-config-btn vs-diff-fetch-btn"
+                        onClick={handleFetchDiff}
+                        disabled={diffLoading || !repository}
+                      >
+                        {diffLoading ? "Fetching…" : "Fetch Changed Files"}
+                      </button>
+                    </div>
+                    {diffFetched && (
+                      <div className="vs-diff-result">
+                        <div className="vs-diff-result-header">
+                          <span>{diffFiles.length} changed file{diffFiles.length !== 1 ? "s" : ""} detected</span>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button type="button" className="vs-save-config-btn" onClick={() => setSelectedFiles(diffFiles)}>All</button>
+                            <button type="button" className="vs-save-config-btn" onClick={() => setSelectedFiles([])}>None</button>
+                          </div>
+                        </div>
+                        <div className="vs-file-list" style={{ maxHeight: "160px", overflow: "auto" }}>
+                          {diffFiles.length === 0
+                            ? <div style={{ color: "#888", padding: "6px 0" }}>No scannable files changed.</div>
+                            : diffFiles.map((path) => (
+                              <label key={path} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.2rem 0", color: "#cbd5f5", fontSize: "0.88rem" }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedFiles.includes(path)}
+                                  onChange={() => toggleFileSelection(path)}
+                                />
+                                <span className="vs-diff-file-path">{path}</span>
+                              </label>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

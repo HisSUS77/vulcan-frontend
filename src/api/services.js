@@ -56,16 +56,13 @@ export const scanService = {
   getLogs: (scanId) => api.get(`/scans/${scanId}/logs`),
   getSummary: (scanId) => api.get(`/scans/${scanId}/summary`),
   cancel: (scanId) => api.post(`/scans/${scanId}/cancel`),
-  // Export scan results
+  // Diff-based scan: get changed files between two git refs
+  getDiffFiles: (repoId, base = "main", head = "HEAD") =>
+    api.get("/scans/diff-files", { params: { repo_id: repoId, base, head } }),
   exportPDF: (scanId) =>
-    api.get(`/reports/${scanId}/export`, {
-      params: { format: "pdf" },
-      responseType: "blob", // CRITICAL for binary data
-    }),
+    api.get(`/reports/${scanId}/export`, { params: { format: "pdf" }, responseType: "blob" }),
   exportJSON: (scanId) =>
-    api.get(`/reports/${scanId}/export`, {
-      params: { format: "json" },
-    }),
+    api.get(`/reports/${scanId}/export`, { params: { format: "json" } }),
 };
 
 // ============= GRAPHS =============
@@ -85,12 +82,12 @@ export const patchService = {
       params: repoId ? { repo_id: repoId } : {},
     }),
   export: (patchId) => api.get(`/patches/${patchId}/export`),
-  // FR-M6.10: Review workflow
   approve: (patchId) => api.post(`/patches/${patchId}/approve`),
   reject: (patchId) => api.post(`/patches/${patchId}/reject`),
-  // FE-5: Patch history / audit trail
   historyForVuln: (vulnerabilityId) =>
     api.get(`/patches/vulnerability/${vulnerabilityId}/history`),
+  // Fix Verification Loop — re-scans patched code to confirm vuln is gone
+  verify: (patchId) => api.post(`/patches/${patchId}/verify`),
 };
 
 // ============= REPORTS =============
@@ -101,6 +98,23 @@ export const reportService = {
     api.get(`/reports/${reportId}/export`, { params: { format } }),
   compare: (reportId1, reportId2) =>
     api.post("/reports/compare", { report_id_1: reportId1, report_id_2: reportId2 }),
+  // Compliance Reports
+  getCompliance: (scanId, framework = "owasp") =>
+    api.get(`/reports/${scanId}/compliance`, { params: { framework } }),
+  exportCompliancePDF: (scanId, framework = "owasp") =>
+    api.get(`/reports/${scanId}/compliance/pdf`, {
+      params: { framework },
+      responseType: "blob",
+    }),
+};
+
+// ============= SANDBOX =============
+export const sandboxService = {
+  checkAvailable: () => api.get("/sandbox/available"),
+  run: (pocCode, language = "python", vulnType = "unknown") =>
+    api.post("/sandbox/run", { poc_code: pocCode, language, vuln_type: vulnType }),
+  runAttackTest: (patchId, attackName, attackTechnique) =>
+    api.post("/sandbox/attack-test", { patch_id: patchId, attack_name: attackName, attack_technique: attackTechnique }),
 };
 
 // ============= SEMANTIC ANALYSIS (NEW) =============

@@ -4,6 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { reportService, scanService } from "../api/services";
 import "../App.css";
 
+const FRAMEWORKS = [
+  { value: "owasp",   label: "OWASP Top 10" },
+  { value: "pci-dss", label: "PCI-DSS 4.0" },
+  { value: "soc2",    label: "SOC2 TSC" },
+];
+
 export default function ReportsPage() {
   const navigate = useNavigate();
   const [scans, setScans] = useState([]);
@@ -20,6 +26,9 @@ export default function ReportsPage() {
   const [patchFilter, setPatchFilter] = useState("all");
   const [patchSearch, setPatchSearch] = useState("");
   const [vulnView, setVulnView] = useState("all"); // all | ai
+  const [complianceFramework, setComplianceFramework] = useState("owasp");
+  const [complianceData, setComplianceData]           = useState(null);
+  const [complianceLoading, setComplianceLoading]     = useState(false);
 
   const normalizeVulns = useCallback((rawVulns, prev = []) => {
     const prevMap = new Map(prev.map((v) => [v.id, v]));
@@ -51,6 +60,7 @@ export default function ReportsPage() {
         patchConfidence: v.patch?.confidence ?? prevV?.patchConfidence,
         patchValidationSummary: v.patch?.validation_summary || prevV?.patchValidationSummary,
         patchId: v.patch?.patch_id || prevV?.patchId,
+        exploit: v.exploit || null,
       };
     });
   }, []);
@@ -269,6 +279,30 @@ export default function ReportsPage() {
       } else {
         setExportMessage("Failed to generate PDF report. Please try again.");
       }
+    }
+  };
+
+  const handleLoadCompliance = async () => {
+    if (!selectedScan) return;
+    setComplianceLoading(true);
+    setComplianceData(null);
+    try {
+      const res = await reportService.getCompliance(selectedScan, complianceFramework);
+      setComplianceData(res.data);
+    } catch (err) {
+      console.error("Compliance load failed:", err);
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+
+  const handleExportCompliancePDF = async () => {
+    if (!selectedScan) return;
+    try {
+      const res = await reportService.exportCompliancePDF(selectedScan, complianceFramework);
+      downloadBlob(res.data, `vulcan-compliance-${complianceFramework}-${selectedScan}.pdf`);
+    } catch (err) {
+      console.error("Compliance PDF export failed:", err);
     }
   };
 
@@ -546,9 +580,97 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          <div className="rp6-panel">
-            <div className="rp6-panel-title">Compliance</div>
-            <div className="rp6-compliance">OWASP Top 10 / CWE / SANS 25</div>
+          <div className="rp6-panel rp6-compliance-panel">
+            <div className="rp6-panel-title">Compliance Report</div>
+            <div className="rp6-compliance-controls">
+              <select
+                className="rp6-select"
+                value={complianceFramework}
+                onChange={(e) => { setComplianceFramework(e.target.value); setComplianceData(null); }}
+              >
+                {FRAMEWORKS.map((f) => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+              <button
+                className="rp6-btn"
+                onClick={handleLoadCompliance}
+                disabled={!selectedScan || complianceLoading}
+              >
+                {complianceLoading ? "Loading…" : "Run Assessment"}
+              </button>
+              {complianceData && (
+                <button className="rp6-btn rp6-btn-primary" onClick={handleExportCompliancePDF}>
+                  Export PDF
+                </button>
+              )}
+            </div>
+
+            {complianceLoading && (
+              <div className="rp6-compliance-loading">
+                <div className="rp6-cyber-loader-bar" style={{ width: "100%", margin: "12px 0" }} />
+                <span>Mapping vulnerabilities to {FRAMEWORKS.find(f=>f.value===complianceFramework)?.label} controls…</span>
+              </div>
+            )}
+
+            {complianceData && !complianceLoading && (() => {
+              const s = complianceData.summary || {};
+              const score = s.score ?? complianceData.score ?? 0;
+              return (
+              <div className="rp6-compliance-body">
+                <div className="rp6-compliance-score-row">
+                  <div className="rp6-compliance-score">
+                    <div className={`rp6-compliance-score-val ${score >= 70 ? "pass" : score >= 40 ? "warn" : "fail"}`}>
+                      {score}%
+                    </div>
+                    <div className="rp6-compliance-score-label">Compliance Score</div>
+                  </div>
+                  <div className="rp6-compliance-meta">
+                    <div><span>Framework</span>{complianceData.framework?.toUpperCase()}</div>
+                    <div><span>Controls assessed</span>{s.total_controls ?? complianceData.controls_assessed ?? "—"}</div>
+                    <div><span>Failed controls</span>{s.failed ?? complianceData.failed_controls ?? "—"}</div>
+                    <div><span>Warnings</span>{s.warnings ?? "—"}</div>
+                    <div><span>Passed</span>{s.passed ?? "—"}</div>
+                  </div>
+                </div>
+
+                {complianceData.controls && complianceData.controls.length > 0 && (
+                  <div className="rp6-compliance-table-wrap">
+                    <table className="rp6-compliance-table">
+                      <thead>
+                        <tr>
+                          <th>Control</th>
+                          <th>Name</th>
+                          <th>Status</th>
+                          <th>Findings</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {complianceData.controls.map((ctrl) => (
+                          <tr key={ctrl.id}>
+                            <td className="rp6-mono">{ctrl.id}</td>
+                            <td>{ctrl.name ?? ctrl.label ?? ctrl.description ?? "—"}</td>
+                            <td>
+                              <span className={`rp6-pill ${ctrl.status === "PASS" || ctrl.status === "pass" ? "rp6-sev low" : ctrl.status === "FAIL" || ctrl.status === "fail" ? "rp6-sev critical" : "rp6-sev medium"}`}>
+                                {ctrl.status?.toUpperCase()}
+                              </span>
+                            </td>
+                            <td>{ctrl.findings_count ?? ctrl.count ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              );
+            })()}
+
+            {!complianceData && !complianceLoading && (
+              <div className="rp6-muted" style={{ marginTop: "12px" }}>
+                Select a framework and run assessment to map scan findings to compliance controls.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -584,6 +706,50 @@ export default function ReportsPage() {
                 <div className="rp6-detail-remediation">{selectedVuln.llmRemediation}</div>
               )}
             </div>
+
+            {selectedVuln.exploit && (
+              <div className={`rp6-detail-card rp6-exploit-card ${selectedVuln.exploit.exploitable ? "exploitable" : "not-exploitable"}`}>
+                <div className="rp6-exploit-header">
+                  <div className="rp6-detail-label">Exploit PoC</div>
+                  <span className={`rp6-exploit-badge ${selectedVuln.exploit.exploitable ? "exploitable" : "not-exploitable"}`}>
+                    {selectedVuln.exploit.exploitable ? "⚡ EXPLOITABLE" : "NOT EXPLOITABLE"}
+                  </span>
+                  <span className="rp6-exploit-conf">
+                    {Math.round((selectedVuln.exploit.confidence || 0) * 100)}% confidence
+                  </span>
+                </div>
+                <div className="rp6-exploit-meta">
+                  {selectedVuln.exploit.exploit_type && (
+                    <div><span>Type</span>{selectedVuln.exploit.exploit_type}</div>
+                  )}
+                  {selectedVuln.exploit.attack_vector && (
+                    <div><span>Attack vector</span>{selectedVuln.exploit.attack_vector}</div>
+                  )}
+                  {selectedVuln.exploit.impact && (
+                    <div><span>Impact</span>{selectedVuln.exploit.impact}</div>
+                  )}
+                </div>
+                {selectedVuln.exploit.bypass_hints && (() => {
+                  const hints = Array.isArray(selectedVuln.exploit.bypass_hints)
+                    ? selectedVuln.exploit.bypass_hints
+                    : String(selectedVuln.exploit.bypass_hints).split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                  return hints.length > 0 ? (
+                    <div className="rp6-exploit-hints">
+                      <div className="rp6-exploit-hints-label">Bypass hints</div>
+                      <ul>
+                        {hints.map((h, i) => <li key={i}>{h}</li>)}
+                      </ul>
+                    </div>
+                  ) : null;
+                })()}
+                {selectedVuln.exploit.poc_code && (
+                  <div className="rp6-exploit-poc">
+                    <div className="rp6-exploit-poc-label">Proof-of-Concept Code</div>
+                    <pre className="rp6-exploit-pre">{selectedVuln.exploit.poc_code}</pre>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
