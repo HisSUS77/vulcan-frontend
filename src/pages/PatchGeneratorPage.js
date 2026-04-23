@@ -32,31 +32,14 @@ const buildDiffRows = (diffText) => {
 };
 
 /* ── AttackSimulationPanel ──────────────────────────────────────────────── */
-function AttackSimulationPanel({ attackTest, patchId }) {
-  const [testResults, setTestResults] = useState({});   // attackName → { loading, verdict, stdout, stderr, error }
+function AttackSimulationPanel({ attackTest }) {
+  const [proofOpen, setProofOpen] = useState(false);
   if (!attackTest) return null;
 
-  const { overall_secure, patch_confidence, attacks, recommendation } = attackTest;
+  const { overall_secure, patch_confidence, attacks, recommendation, raw_analysis } = attackTest;
   const pct = Math.min(100, Math.max(0, patch_confidence ?? 0));
   const confClass = pct >= 75 ? "high" : pct >= 50 ? "medium" : "low";
-
-  const handleTest = async (atk) => {
-    if (!patchId) return;
-    setTestResults(prev => ({ ...prev, [atk.name]: { loading: true } }));
-    try {
-      const res = await sandboxService.runAttackTest(patchId, atk.name, atk.technique || atk.name);
-      const d = res.data;
-      setTestResults(prev => ({
-        ...prev,
-        [atk.name]: { loading: false, verdict: d.verdict, stdout: d.stdout, stderr: d.stderr, timed_out: d.timed_out, error: d.error },
-      }));
-    } catch (err) {
-      setTestResults(prev => ({
-        ...prev,
-        [atk.name]: { loading: false, verdict: "ERROR", error: err?.response?.data?.detail || err.message },
-      }));
-    }
-  };
+  const blockedCount = (attacks || []).filter(a => (a.result||"").toUpperCase() === "BLOCKED").length;
 
   return (
     <div className="pg6-attack-panel">
@@ -86,41 +69,51 @@ function AttackSimulationPanel({ attackTest, patchId }) {
       {attacks && attacks.length > 0 && (
         <div className="pg6-attack-grid">
           {attacks.map((atk, i) => {
-            const blocked  = (atk.result || "").toUpperCase() === "BLOCKED";
-            const tr       = testResults[atk.name] || {};
-            const verdict  = tr.verdict;
+            const blocked = (atk.result || "").toUpperCase() === "BLOCKED";
             return (
               <div key={i} className={`pg6-attack-row ${blocked ? "blocked" : "bypassed"}`}>
                 <span className={`pg6-attack-badge ${blocked ? "blocked" : "bypassed"}`}>
                   {blocked ? "BLOCKED" : "BYPASSED"}
                 </span>
                 <div className="pg6-attack-info">
-                  <div className="pg6-attack-name">{atk.name}</div>
+                  <div className="pg6-attack-name">
+                    {atk.name}
+                    {atk.technique && (
+                      <span className="pg6-attack-technique">via: {atk.technique}</span>
+                    )}
+                  </div>
                   <div className="pg6-attack-reason">{atk.explanation}</div>
-                  {/* Sandbox live result */}
-                  {verdict && (
-                    <div className={`pg6-attack-sandbox-result ${verdict.toLowerCase()}`}>
-                      <span className="pg6-attack-sandbox-label">SANDBOX:</span>
-                      <span className={`pg6-attack-sandbox-verdict ${verdict.toLowerCase()}`}>{verdict}</span>
-                      {tr.stdout && <pre className="pg6-attack-sandbox-out">{tr.stdout.slice(0, 300)}</pre>}
-                      {tr.stderr && !tr.stdout && <pre className="pg6-attack-sandbox-out err">{tr.stderr.slice(0, 200)}</pre>}
-                      {tr.error  && <span className="pg6-attack-sandbox-err">{tr.error}</span>}
-                    </div>
-                  )}
                 </div>
-                {patchId && (
-                  <button
-                    className="pg6-attack-test-btn"
-                    onClick={() => handleTest(atk)}
-                    disabled={tr.loading}
-                    title="Run this attack in the sandbox against the patched code"
-                  >
-                    {tr.loading ? "…" : "▶ SANDBOX"}
-                  </button>
-                )}
+                <span className={`pg6-attack-ai-proof ${blocked ? "blocked" : "bypassed"}`}>
+                  {blocked ? "✓ AI VERIFIED" : "⚠ AI FLAGGED"}
+                </span>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Proof summary bar */}
+      <div className="pg6-attack-proof-bar">
+        <span className="pg6-attack-proof-stat">
+          <span className="pg6-attack-proof-num">{blockedCount}</span>
+          <span className="pg6-attack-proof-label">/ {(attacks||[]).length} attacks blocked by AI analysis</span>
+        </span>
+        {raw_analysis && (
+          <button className="pg6-attack-proof-toggle" onClick={() => setProofOpen(o => !o)}>
+            {proofOpen ? "▲ Hide AI Reasoning" : "▼ View Full AI Proof"}
+          </button>
+        )}
+      </div>
+
+      {/* Full AI reasoning chain */}
+      {proofOpen && raw_analysis && (
+        <div className="pg6-attack-raw">
+          <div className="pg6-attack-raw-header">
+            <span className="pg6-attack-raw-icon">🤖</span>
+            Full AI Adversarial Reasoning Chain
+          </div>
+          <pre className="pg6-attack-raw-body">{raw_analysis}</pre>
         </div>
       )}
 
@@ -806,7 +799,7 @@ export default function PatchGeneratorPage() {
 
       {/* ── Adversarial Attack Simulation ── */}
       {selectedPatch?.attack_test && (
-        <AttackSimulationPanel attackTest={selectedPatch.attack_test} patchId={selectedPatch.patch_id} />
+        <AttackSimulationPanel attackTest={selectedPatch.attack_test} />
       )}
       {loading && (
         <div className="pg6-attack-panel">

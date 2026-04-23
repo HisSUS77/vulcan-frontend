@@ -19,6 +19,7 @@ import AppLayout from "./components/layout/AppLayout";
 import RequireAuth from "./components/RequireAuth";
 import RequireRole from "./components/RequireRole";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import BenchmarkPage from "./pages/BenchmarkPage";
 
 function App() {
   return (
@@ -110,6 +111,18 @@ function App() {
               <RequireRole roles={["admin"]}>
                 <AppLayout>
                   <AdminUsersPage />
+                </AppLayout>
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/benchmark"
+          element={
+            <RequireAuth>
+              <RequireRole roles={["admin"]}>
+                <AppLayout>
+                  <BenchmarkPage />
                 </AppLayout>
               </RequireRole>
             </RequireAuth>

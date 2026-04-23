@@ -131,3 +131,21 @@ export const adminService = {
   listUsers: () => api.get("/admin/users"),
   updateUserRole: (userId, role) => api.patch(`/admin/users/${userId}`, { role }),
 };
+
+// ============= BENCHMARK =============
+export const benchmarkService = {
+  listTestCases: (params = {}) => api.get("/benchmark/test-cases", { params }),
+  createTestCase: (data) => api.post("/benchmark/test-cases", data),
+  deleteTestCase: (id) => api.delete(`/benchmark/test-cases/${id}`),
+  runBenchmark: (enableLlm = false) => api.post("/benchmark/run", { enable_llm: enableLlm }, { timeout: 300000 }),
+  listRuns: (limit = 20) => api.get("/benchmark/runs", { params: { limit, run_type: "synthetic" } }),
+  listFieldRuns: (limit = 20) => api.get("/benchmark/runs", { params: { limit, run_type: "field" } }),
+  getRun: (id) => api.get(`/benchmark/runs/${id}`),
+  leaderboard: () => api.get("/benchmark/leaderboard"),
+  // AI-oracle field confirmation
+  fieldMetrics: () => api.get("/benchmark/field-metrics"),
+  confirmedFindings: (verdict, limit = 100) => api.get("/benchmark/confirmed-findings", { params: { verdict, limit } }),
+  spotcheck: (only_pending = true) => api.get("/benchmark/spotcheck", { params: { only_pending } }),
+  submitVerdict: (id, verdict) => api.patch(`/benchmark/spotcheck/${id}`, { verdict }),
+  runFieldBenchmark: () => api.post("/benchmark/run-field", {}, { timeout: 300000 }),
+};

@@ -15,6 +15,7 @@ import {
   FileBarChart,
   Search,
   Users,
+  FlaskConical,
 } from "lucide-react";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { label: "Graphs", to: "/graphs", icon: <Share2 size={20} />, roles: ["normal", "premium", "admin"] },
   { label: "Patch Generator", to: "/patches", icon: <FileDiff size={20} />, roles: ["premium", "admin"] },
   { label: "Reports", to: "/reports", icon: <FileBarChart size={20} />, roles: ["normal", "premium", "admin"] },
+  { label: "Benchmark", to: "/benchmark", icon: <FlaskConical size={20} />, roles: ["admin"] },
   { label: "Users", to: "/admin/users", icon: <Users size={20} />, roles: ["admin"] },
 ];
 
