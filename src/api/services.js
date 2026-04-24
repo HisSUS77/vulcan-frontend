@@ -63,6 +63,8 @@ export const scanService = {
     api.get(`/reports/${scanId}/export`, { params: { format: "pdf" }, responseType: "blob" }),
   exportJSON: (scanId) =>
     api.get(`/reports/${scanId}/export`, { params: { format: "json" } }),
+  exportSARIF: (scanId) =>
+    api.get(`/reports/${scanId}/export`, { params: { format: "sarif" } }),
 };
 
 // ============= GRAPHS =============

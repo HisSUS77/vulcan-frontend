@@ -45,6 +45,7 @@ export default function ReportsPage() {
         file: v.location?.file || "N/A",
         line: `${v.location?.start_line}-${v.location?.end_line}`,
         confidence: Math.round((v.confidence || 0) * 100),
+        cvss_score: v.cvss_score ?? null,
         source: v.evidence?.source,
         sink: v.evidence?.sink,
         pattern: v.evidence?.pattern,
@@ -266,6 +267,19 @@ export default function ReportsPage() {
     downloadBlob(blob, `scan-report-${selectedScan}.csv`);
   };
 
+  const handleExportSARIF = async () => {
+    if (!selectedScan) return;
+    try {
+      const response = await scanService.exportSARIF(selectedScan);
+      const data = response.data;
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      downloadBlob(blob, `vulcan-${selectedScan}.sarif`);
+    } catch (err) {
+      console.error("Failed to export SARIF:", err);
+      setExportMessage("Failed to export SARIF. Please try again.");
+    }
+  };
+
   const handleExportPDF = async () => {
     if (!selectedScan) return;
     try {
@@ -365,6 +379,9 @@ export default function ReportsPage() {
           </button>
           <button className="rp6-btn" onClick={handleExportCSV} disabled={!filteredVulnerabilities.length}>
             Export CSV
+          </button>
+          <button className="rp6-btn" onClick={handleExportSARIF} disabled={!selectedScan} title="SARIF 2.1.0 — compatible with GitHub, VS Code, Azure DevOps">
+            Export SARIF
           </button>
           <button className="rp6-btn rp6-btn-primary" onClick={handleExportPDF} disabled={!filteredVulnerabilities.length}>
             Export PDF
@@ -473,6 +490,7 @@ export default function ReportsPage() {
                 <tr>
                   <th>Type</th>
                   <th>Severity</th>
+                  <th>CVSS</th>
                   <th>CWE</th>
                   <th>OWASP</th>
                   <th>File</th>
@@ -498,6 +516,9 @@ export default function ReportsPage() {
                         <span className={`rp6-pill rp6-sev ${row.severity.toLowerCase()}`}>
                           {row.severity}
                         </span>
+                      </td>
+                      <td className="rp6-mono" style={{ fontWeight: 600, color: row.cvss_score >= 9 ? "#f97373" : row.cvss_score >= 7 ? "#fb923c" : row.cvss_score >= 4 ? "#fbbf24" : "#22d3ee" }}>
+                        {row.cvss_score != null ? row.cvss_score.toFixed(1) : "—"}
                       </td>
                       <td className="rp6-mono">{row.cwe}</td>
                       <td className="rp6-mono">{row.owasp}</td>
