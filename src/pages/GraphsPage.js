@@ -419,29 +419,15 @@ function GraphsPage() {
         viewBox="0 0 800 600"
         style={{ background: '#080d1a', borderRadius: '8px', border: '1px solid rgba(34,211,238,0.08)' }}
       >
-        {/* Define arrow markers */}
+        {/* Arrow markers — userSpaceOnUse so size is absolute px, not stroke-relative */}
         <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="10"
-            refX="25"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M0,0 L0,6 L9,3 z" fill="#334155" />
+          <marker id="arrowhead" markerWidth="10" markerHeight="7"
+            refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,7 L10,3.5 z" fill="#2a4a6b" />
           </marker>
-          <marker
-            id="arrowhead-red"
-            markerWidth="10"
-            markerHeight="10"
-            refX="25"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
-          >
-            <path d="M0,0 L0,6 L9,3 z" fill="#ef4444" />
+          <marker id="arrowhead-red" markerWidth="10" markerHeight="7"
+            refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,7 L10,3.5 z" fill="#ef4444" />
           </marker>
         </defs>
 
@@ -449,79 +435,48 @@ function GraphsPage() {
         <g className="edges">
           {edgesToShow.map((edge, idx) => {
             const fromNode = nodesToShow.find(n => n.id === edge.from);
-            const toNode = nodesToShow.find(n => n.id === edge.to);
-
+            const toNode   = nodesToShow.find(n => n.id === edge.to);
             if (!fromNode || !toNode) return null;
 
             const fromPos = getNodePosition(nodesToShow.indexOf(fromNode), nodesToShow.length);
-            const toPos = getNodePosition(nodesToShow.indexOf(toNode), nodesToShow.length);
+            const toPos   = getNodePosition(nodesToShow.indexOf(toNode),   nodesToShow.length);
 
-            const isInPath = vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to);
-            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.15) : (isInPath ? 0.95 : 0.5);
-            const edgeStroke = isInPath ? "#ef4444" : "#1e3a5f";
-            const edgeWidth = isInPath ? 3 : 1.2;
-            const edgeMarker = isInPath && isPathMode ? "url(#arrowhead-red)" : "none";
+            // Direction vector
+            const dx  = toPos.x - fromPos.x;
+            const dy  = toPos.y - fromPos.y;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+
+            // Radii — path nodes are larger
+            const fromR = vulnerablePath.has(fromNode.id) ? 32 : 24;
+            const toR   = vulnerablePath.has(toNode.id)   ? 32 : 24;
+
+            // Start at from-circle edge, end just before to-circle edge (arrowhead fills the gap)
+            const x1 = fromPos.x + (dx / len) * fromR;
+            const y1 = fromPos.y + (dy / len) * fromR;
+            const x2 = toPos.x   - (dx / len) * (toR + 11); // 11 = arrowhead length
+            const y2 = toPos.y   - (dy / len) * (toR + 11);
+
+            // Skip zero-length lines (self-loops or coincident nodes)
+            if (Math.sqrt((x2-x1)**2 + (y2-y1)**2) < 5) return null;
+
+            const isInPath   = vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to);
+            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.1) : (isInPath ? 0.85 : 0.35);
+            const edgeStroke  = isInPath ? "#ef4444" : "#1e3a5f";
+            const edgeWidth   = isInPath ? 2.5 : 1;
+            const marker      = isInPath ? "url(#arrowhead-red)" : "url(#arrowhead)";
 
             return (
-              <g key={`edge-${idx}`}>
-                <line
-                  x1={fromPos.x}
-                  y1={fromPos.y}
-                  x2={toPos.x}
-                  y2={toPos.y}
-                  stroke={edgeStroke}
-                  strokeWidth={edgeWidth}
-                  markerEnd={edgeMarker}
-                  opacity={edgeOpacity}
-                >
-                  {isInPath && (
-                    <animate
-                      attributeName="stroke-opacity"
-                      values="1;0.4;1"
-                      dur="1.5s"
-                      repeatCount="indefinite"
-                    />
-                  )}
-                </line>
-                {/* Edge label */}
-                <text
-                  x={(fromPos.x + toPos.x) / 2}
-                  y={(fromPos.y + toPos.y) / 2}
-                  fill={isInPath ? "#f87171" : "#334155"}
-                  fontSize="9"
-                  textAnchor="middle"
-                >
-                  {edge.label || edge.type}
-                </text>
-              </g>
+              <line
+                key={`edge-${idx}`}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={edgeStroke}
+                strokeWidth={edgeWidth}
+                markerEnd={marker}
+                opacity={edgeOpacity}
+              />
             );
           })}
         </g>
-
-        {/* Draw explicit vulnerable path arrows */}
-        {pathEdges.length > 0 && (
-          <g className="path-edges">
-            {pathEdges.map((edge, idx) => {
-              const fromIdx = nodeIndexById.get(edge.from);
-              const toIdx = nodeIndexById.get(edge.to);
-              const fromPos = getNodePosition(fromIdx, nodesToShow.length);
-              const toPos = getNodePosition(toIdx, nodesToShow.length);
-              return (
-                <line
-                  key={`path-edge-${idx}`}
-                  x1={fromPos.x}
-                  y1={fromPos.y}
-                  x2={toPos.x}
-                  y2={toPos.y}
-                  stroke="#ef4444"
-                  strokeWidth={isPathMode ? 3.5 : 2}
-                  markerEnd="url(#arrowhead-red)"
-                  opacity={isPathMode ? 0.95 : 0.65}
-                />
-              );
-            })}
-          </g>
-        )}
 
         {/* Draw nodes */}
         <g className="nodes">
