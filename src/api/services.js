@@ -128,6 +128,11 @@ export const analysisService = {
   getFindings: () => api.get("/analysis/findings"),
 };
 
+// ============= ATTACK SURFACE =============
+export const attackSurfaceService = {
+  get: (scanId) => api.get(`/attack-surface/${scanId}`),
+};
+
 // ============= ADMIN =============
 export const adminService = {
   listUsers: () => api.get("/admin/users"),

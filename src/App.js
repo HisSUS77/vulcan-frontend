@@ -20,6 +20,7 @@ import RequireAuth from "./components/RequireAuth";
 import RequireRole from "./components/RequireRole";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import BenchmarkPage from "./pages/BenchmarkPage";
+import AttackSurfacePage from "./pages/AttackSurfacePage";
 
 function App() {
   return (
@@ -125,6 +126,16 @@ function App() {
                   <BenchmarkPage />
                 </AppLayout>
               </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attack-surface"
+          element={
+            <RequireAuth>
+              <AppLayout>
+                <AttackSurfacePage />
+              </AppLayout>
             </RequireAuth>
           }
         />

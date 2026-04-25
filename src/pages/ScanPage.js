@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 import { repositoryService, scanService } from "../api/services";
+import { api } from "../api/client";
 
 function ScanPage() {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ function ScanPage() {
   const [currentScanId, setCurrentScanId] = useState(null);
   const [scanSummary, setScanSummary] = useState(null);
   const pollInterval = useRef(null);
+  const wsRef = useRef(null);
   const lineCount = directCode.split("\n").length;
   const lineCountColor = lineCount > 390 ? "#f97373" : lineCount > 360 ? "#f59e0b" : "#888";
   const [resumeScanId, setResumeScanId] = useState(null);
@@ -142,88 +144,140 @@ function ScanPage() {
     }
   }, [repository, branch, scanScope, inputMode, fetchRepoFiles]);
 
-  // Poll scan status when scanning
+  // Shared handler: called by both WebSocket and fallback poll
+  const handleScanDone = useCallback(async (state, wsSummary) => {
+    setScanning(false);
+    if (state === "COMPLETED") {
+      let summary = wsSummary;
+      if (!summary || !summary.vulnerabilities_found) {
+        try {
+          const r = await scanService.getSummary(currentScanId);
+          summary = r.data;
+        } catch { /* keep ws summary */ }
+      }
+      if (summary) {
+        setScanSummary(summary);
+        setAiConfidence(Math.round((summary?.ai_confidence || 0) * 100));
+        localStorage.setItem(`scan_${currentScanId}`, JSON.stringify(summary));
+        localStorage.setItem("lastScanId", currentScanId);
+
+        if (summary?.vulnerabilities?.length > 0) {
+          const vulnLogs = summary.vulnerabilities.map((v, idx) => {
+            const llmClass = v.analysis?.llm_classification?.classification || "N/A";
+            const exploitability = v.analysis?.llm_classification?.exploitability
+              ? Math.round(v.analysis.llm_classification.exploitability * 100) + "%"
+              : "N/A";
+            return {
+              time: new Date().toLocaleTimeString(),
+              text: `#${idx + 1} ${v.type} | ${v.evidence?.source} -> ${v.evidence?.sink} | Line ${v.location?.start_line} | AI: ${llmClass} | Exploit: ${exploitability}`,
+              severity: v.severity,
+            };
+          });
+          setLogs((prev) => [...prev, ...vulnLogs]);
+        }
+        setLogs((prev) => [
+          ...prev,
+          {
+            time: new Date().toLocaleTimeString(),
+            text: `Scan completed: ${summary.vulnerabilities_found} vulnerabilities (${summary.by_severity?.critical || 0} critical, ${summary.by_severity?.high || 0} high) in ${summary.duration_seconds?.toFixed(2)}s`,
+          },
+        ]);
+        setToast(summary.total_files === 0 ? "No scannable files found in the repository." : "Scan completed successfully.");
+      }
+    } else {
+      setToast(`Scan ${state.toLowerCase()}.`);
+    }
+    setTimeout(() => setToast(""), 4000);
+  }, [currentScanId]);
+
+  // Real-time WebSocket scan streaming (falls back to 2 s polling on WS error)
   useEffect(() => {
     if (!scanning || !currentScanId) return;
 
-    const poll = async () => {
-      try {
-        const statusRes = await scanService.getStatus(currentScanId);
-        const status = statusRes.data;
-        setProgress(status.progress || 0);
-        setEta(status.eta || "");
+    const token = localStorage.getItem("access_token");
+    const baseUrl = (api.defaults.baseURL || "http://localhost:8000/api/v1").replace(/^http/, "ws");
+    const wsUrl = `${baseUrl}/scans/ws/${currentScanId}?token=${encodeURIComponent(token || "")}`;
 
-        // Fetch logs
-        const logsRes = await scanService.getLogs(currentScanId);
-        const logLines = logsRes.data?.logs || [];
-        setLogs(
-          logLines.map((l, idx) => ({
-            time: new Date().toLocaleTimeString(),
-            text: l,
-          }))
-        );
+    let ws = null;
+    let usedFallback = false;
 
-        if (["COMPLETED", "FAILED", "CANCELLED"].includes(status.state)) {
-          setScanning(false);
-          clearInterval(pollInterval.current);
-          if (status.state === "COMPLETED") {
-            const summaryRes = await scanService.getSummary(currentScanId);
-            const summary = summaryRes.data;
-            setScanSummary(summary);
-            setAiConfidence(
-              Math.round((summary?.ai_confidence || 0) * 100)
-            );
-            
-            // Save to localStorage for cross-page persistence
-            localStorage.setItem(`scan_${currentScanId}`, JSON.stringify(summary));
-            localStorage.setItem("lastScanId", currentScanId);
-            
-            // Add vulnerabilities to logs with detailed information
-            if (summary?.vulnerabilities?.length > 0) {
-              const vulnLogs = summary.vulnerabilities.map((v, idx) => {
-                const llmClass = v.analysis?.llm_classification?.classification || 'N/A';
-                const exploitability = v.analysis?.llm_classification?.exploitability 
-                  ? Math.round(v.analysis.llm_classification.exploitability * 100) + '%'
-                  : 'N/A';
-                
-                return {
-                  time: new Date().toLocaleTimeString(),
-                  text: `#${idx + 1} ${v.type} | ${v.evidence?.source} -> ${v.evidence?.sink} | Line ${v.location.start_line} | AI: ${llmClass} | Exploit: ${exploitability}`,
-                  severity: v.severity
-                };
-              });
-              setLogs(prev => [...prev, ...vulnLogs]);
-            }
-            
-            // Add completion summary log
-            const summaryLog = {
-              time: new Date().toLocaleTimeString(),
-              text: `Scan completed: ${summary.vulnerabilities_found} vulnerabilities (${summary.by_severity?.critical || 0} critical, ${summary.by_severity?.high || 0} high) in ${summary.duration_seconds?.toFixed(2)}s`
-            };
-            setLogs(prev => [...prev, summaryLog]);
-            
-            if (summary.total_files === 0) {
-              setToast("No scannable files found in the repository.");
-            } else {
-              setToast("Scan completed successfully.");
-            }
-          } else {
-            setToast(`Scan ${status.state.toLowerCase()}.`);
+    const startFallbackPoll = () => {
+      if (usedFallback) return;
+      usedFallback = true;
+
+      const poll = async () => {
+        try {
+          const statusRes = await scanService.getStatus(currentScanId);
+          const status = statusRes.data;
+          setProgress(status.progress || 0);
+          setEta(status.eta || "");
+
+          const logsRes = await scanService.getLogs(currentScanId);
+          const logLines = logsRes.data?.logs || [];
+          setLogs(logLines.map((l) => ({ time: new Date().toLocaleTimeString(), text: l })));
+
+          if (["COMPLETED", "FAILED", "CANCELLED"].includes(status.state)) {
+            clearInterval(pollInterval.current);
+            await handleScanDone(status.state, null);
           }
-          setTimeout(() => setToast(""), 4000);
+        } catch (err) {
+          console.error("Poll error:", err);
         }
-      } catch (err) {
-        console.error("Poll error:", err);
-      }
+      };
+
+      poll();
+      pollInterval.current = setInterval(poll, 2000);
     };
 
-    poll();
-    pollInterval.current = setInterval(poll, 2000);
+    try {
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setLogs((prev) => [...prev, { time: new Date().toLocaleTimeString(), text: "[WS] Live stream connected" }]);
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === "status") {
+            setProgress(msg.progress || 0);
+            setEta(msg.eta || "");
+          } else if (msg.type === "logs") {
+            const lines = (msg.lines || []).map((l) => ({ time: new Date().toLocaleTimeString(), text: l }));
+            if (lines.length) setLogs((prev) => {
+              const existing = new Set(prev.map((x) => x.text));
+              return [...prev, ...lines.filter((l) => !existing.has(l.text))];
+            });
+          } else if (msg.type === "done") {
+            handleScanDone(msg.state, msg.summary || null);
+          } else if (msg.type === "error") {
+            console.warn("[WS] scan error:", msg.message);
+          }
+        } catch { /* ignore parse errors */ }
+      };
+
+      ws.onerror = () => {
+        console.warn("[WS] WebSocket error — falling back to polling");
+        startFallbackPoll();
+      };
+
+      ws.onclose = (evt) => {
+        if (evt.code === 4001) {
+          console.warn("[WS] Auth failed — falling back to polling");
+          startFallbackPoll();
+        }
+      };
+    } catch {
+      startFallbackPoll();
+    }
 
     return () => {
+      if (ws) ws.close();
+      wsRef.current = null;
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [scanning, currentScanId]);
+  }, [scanning, currentScanId, handleScanDone]);
 
   const handleDirectCodeChange = (e) => {
     const code = e.target.value;
@@ -309,6 +363,7 @@ function ScanPage() {
       setEta("Scan cancelled");
       setToast("Scan was cancelled.");
       setTimeout(() => setToast(""), 4000);
+      if (wsRef.current) { wsRef.current.close(); wsRef.current = null; }
       if (pollInterval.current) clearInterval(pollInterval.current);
     } catch (err) {
       console.error("Failed to cancel scan:", err);
