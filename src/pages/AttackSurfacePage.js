@@ -11,19 +11,23 @@ const METHOD_COLOR = { GET: "#3b82f6", POST: "#8b5cf6", PUT: "#f59e0b", DELETE: 
 const SEV_RANK    = { critical: 4, high: 3, medium: 2, low: 1 };
 
 const SVG_W = 920;
-const SVG_H = 560;
+const SVG_H = 580;
+
+/* ── helpers ────────────────────────────────────────────────────────── */
+const nodeRadius = (n) => Math.max(22, Math.min(44, 16 + (n.vuln_count || 0) * 5));
 
 /* ── force simulation ───────────────────────────────────────────────── */
 function simulate(nodes, edges) {
   if (!nodes.length) return [];
   const n = nodes.length;
 
-  // Circular initial layout
+  // Spread nodes in a larger initial circle so repulsion has room to work
+  const initR = Math.min(SVG_W, SVG_H) * 0.38;
   const pos = nodes.map((_, i) => ({
-    x: SVG_W / 2 + Math.cos((2 * Math.PI * i) / n) * Math.min(SVG_W, SVG_H) * 0.32,
-    y: SVG_H / 2 + Math.sin((2 * Math.PI * i) / n) * Math.min(SVG_W, SVG_H) * 0.32,
-    vx: 0,
-    vy: 0,
+    x: SVG_W / 2 + Math.cos((2 * Math.PI * i) / n) * initR,
+    y: SVG_H / 2 + Math.sin((2 * Math.PI * i) / n) * initR,
+    vx: (Math.random() - 0.5) * 2,  // tiny jitter so symmetric layouts break
+    vy: (Math.random() - 0.5) * 2,
   }));
 
   const edgeIdx = edges
@@ -33,20 +37,20 @@ function simulate(nodes, edges) {
     }))
     .filter((e) => e.s >= 0 && e.t >= 0);
 
-  const ITERS  = 260;
-  const MARGIN = 72;
+  const ITERS  = 320;
+  const MARGIN = 85;
 
   for (let iter = 0; iter < ITERS; iter++) {
-    const alpha = Math.pow(0.985, iter);
+    const alpha = Math.pow(0.988, iter);
 
-    // Repulsion between all node pairs
+    // Repulsion — much stronger so nodes can't cluster
     for (let i = 0; i < n; i++) {
       for (let j = i + 1; j < n; j++) {
         const dx = pos[j].x - pos[i].x || 0.01;
         const dy = pos[j].y - pos[i].y || 0.01;
         const d2 = dx * dx + dy * dy || 0.01;
         const d  = Math.sqrt(d2);
-        const f  = (9500 * alpha) / d2;
+        const f  = (28000 * alpha) / d2;
         const fx = (f * dx) / d;
         const fy = (f * dy) / d;
         pos[i].vx -= fx; pos[i].vy -= fy;
@@ -59,31 +63,45 @@ function simulate(nodes, edges) {
       const dx = pos[t].x - pos[s].x;
       const dy = pos[t].y - pos[s].y;
       const d  = Math.sqrt(dx * dx + dy * dy) || 1;
-      const f  = ((d - 175) * 0.055 * alpha) / d;
+      const f  = ((d - 190) * 0.04 * alpha) / d;
       pos[s].vx += f * dx; pos[s].vy += f * dy;
       pos[t].vx -= f * dx; pos[t].vy -= f * dy;
     }
 
-    // Center gravity
+    // Weak center gravity — just enough to keep graph on screen
     for (const p of pos) {
-      p.vx += (SVG_W / 2 - p.x) * 0.004;
-      p.vy += (SVG_H / 2 - p.y) * 0.004;
+      p.vx += (SVG_W / 2 - p.x) * 0.0018;
+      p.vy += (SVG_H / 2 - p.y) * 0.0018;
     }
 
     // Integrate + damp + clamp
     for (const p of pos) {
-      p.vx *= 0.87;
-      p.vy *= 0.87;
+      p.vx *= 0.85;
+      p.vy *= 0.85;
       p.x = Math.max(MARGIN, Math.min(SVG_W - MARGIN, p.x + p.vx));
       p.y = Math.max(MARGIN, Math.min(SVG_H - MARGIN, p.y + p.vy));
+    }
+
+    // Hard collision resolution — push overlapping nodes apart directly
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const minD = nodeRadius(nodes[i]) + nodeRadius(nodes[j]) + 18;
+        const dx   = pos[j].x - pos[i].x || 0.01;
+        const dy   = pos[j].y - pos[i].y || 0.01;
+        const d    = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (d < minD) {
+          const push = (minD - d) / 2;
+          pos[i].x -= (push * dx) / d;
+          pos[i].y -= (push * dy) / d;
+          pos[j].x += (push * dx) / d;
+          pos[j].y += (push * dy) / d;
+        }
+      }
     }
   }
 
   return pos;
 }
-
-/* ── helpers ────────────────────────────────────────────────────────── */
-const nodeRadius = (n) => Math.max(26, Math.min(54, 20 + (n.vuln_count || 0) * 8));
 
 /* ── VulnRow ────────────────────────────────────────────────────────── */
 function VulnRow({ v }) {
