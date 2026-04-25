@@ -429,29 +429,6 @@ function DashboardPage() {
         <section className="v-card v-card-wide">
           <header className="v-card-header">
             <h2>Vulnerabilities by Severity</h2>
-            {summary?.risk && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: "8px",
-                marginLeft: "auto", padding: "4px 12px",
-                borderRadius: "20px", fontSize: "13px", fontWeight: 700,
-                background: summary.risk.score >= 75 ? "rgba(249,115,22,0.15)" :
-                            summary.risk.score >= 50 ? "rgba(251,146,60,0.15)" :
-                            summary.risk.score >= 25 ? "rgba(251,191,36,0.15)" :
-                            "rgba(34,197,94,0.15)",
-                border: `1px solid ${
-                  summary.risk.score >= 75 ? "#f97316" :
-                  summary.risk.score >= 50 ? "#fb923c" :
-                  summary.risk.score >= 25 ? "#fbbf24" : "#22c55e"
-                }`,
-                color: summary.risk.score >= 75 ? "#f97316" :
-                       summary.risk.score >= 50 ? "#fb923c" :
-                       summary.risk.score >= 25 ? "#fbbf24" : "#22c55e",
-              }}>
-                <span>Risk</span>
-                <span style={{ fontSize: "18px" }}>{summary.risk.score}</span>
-                <span style={{ opacity: 0.8 }}>{summary.risk.label}</span>
-              </div>
-            )}
           </header>
           <div className="v-chart-wrap">
             <Doughnut data={severityData} options={severityOptions} />
