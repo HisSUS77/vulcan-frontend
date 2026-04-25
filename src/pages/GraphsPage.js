@@ -421,13 +421,13 @@ function GraphsPage() {
       >
         {/* Arrow markers — userSpaceOnUse so size is absolute px, not stroke-relative */}
         <defs>
-          <marker id="arrowhead" markerWidth="10" markerHeight="7"
-            refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-            <path d="M0,0 L0,7 L10,3.5 z" fill="#2a4a6b" />
+          <marker id="arrowhead" markerWidth="16" markerHeight="11"
+            refX="14" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,11 L16,5.5 z" fill="#3a6a9b" />
           </marker>
-          <marker id="arrowhead-red" markerWidth="10" markerHeight="7"
-            refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
-            <path d="M0,0 L0,7 L10,3.5 z" fill="#ef4444" />
+          <marker id="arrowhead-red" markerWidth="16" markerHeight="11"
+            refX="14" refY="5.5" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,11 L16,5.5 z" fill="#ef4444" />
           </marker>
         </defs>
 
@@ -453,16 +453,16 @@ function GraphsPage() {
             // Start at from-circle edge, end just before to-circle edge (arrowhead fills the gap)
             const x1 = fromPos.x + (dx / len) * fromR;
             const y1 = fromPos.y + (dy / len) * fromR;
-            const x2 = toPos.x   - (dx / len) * (toR + 11); // 11 = arrowhead length
-            const y2 = toPos.y   - (dy / len) * (toR + 11);
+            const x2 = toPos.x   - (dx / len) * (toR + 17); // 17 = arrowhead length
+            const y2 = toPos.y   - (dy / len) * (toR + 17);
 
             // Skip zero-length lines (self-loops or coincident nodes)
             if (Math.sqrt((x2-x1)**2 + (y2-y1)**2) < 5) return null;
 
             const isInPath   = vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to);
-            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.1) : (isInPath ? 0.85 : 0.35);
-            const edgeStroke  = isInPath ? "#ef4444" : "#1e3a5f";
-            const edgeWidth   = isInPath ? 2.5 : 1;
+            const edgeOpacity = isPathMode ? (isInPath ? 1 : 0.12) : (isInPath ? 0.9 : 0.55);
+            const edgeStroke  = isInPath ? "#ef4444" : "#2a5a8a";
+            const edgeWidth   = isInPath ? 2.5 : 1.5;
             const marker      = isInPath ? "url(#arrowhead-red)" : "url(#arrowhead)";
 
             return (
@@ -527,24 +527,26 @@ function GraphsPage() {
                 {/* Node label */}
                 <text
                   x={pos.x}
-                  y={pos.y - 35}
+                  y={pos.y - 38}
                   fill={isInPath ? "#fca5a5" : "#94a3b8"}
-                  fontSize="11"
-                  fontWeight={isInPath ? "bold" : "normal"}
+                  fontSize="13"
+                  fontWeight={isInPath ? "700" : "500"}
                   textAnchor="middle"
                   pointerEvents="none"
+                  fontFamily="monospace"
                 >
-                  {node.label.length > 15 ? node.label.substring(0, 15) + '...' : node.label}
+                  {node.label.length > 18 ? node.label.substring(0, 17) + '…' : node.label}
                 </text>
 
                 {/* Node type */}
                 <text
                   x={pos.x}
-                  y={pos.y + 42}
-                  fill="#334155"
-                  fontSize="9"
+                  y={pos.y + 46}
+                  fill={isInPath ? "#6b7280" : "#3a5070"}
+                  fontSize="10"
                   textAnchor="middle"
                   pointerEvents="none"
+                  fontFamily="monospace"
                 >
                   {node.type}
                 </text>
@@ -553,11 +555,12 @@ function GraphsPage() {
                 {node.properties?.line && (
                   <text
                     x={pos.x}
-                    y={pos.y + 54}
-                    fill="#1e3a5f"
-                    fontSize="8"
+                    y={pos.y + 59}
+                    fill={isInPath ? "#4b5563" : "#1e3a5f"}
+                    fontSize="9"
                     textAnchor="middle"
                     pointerEvents="none"
+                    fontFamily="monospace"
                   >
                     L{node.properties.line}
                   </text>
