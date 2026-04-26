@@ -17,6 +17,7 @@ import {
   Users,
   FlaskConical,
   Crosshair,
+  Skull,
 } from "lucide-react";
 
 const navItems = [
@@ -24,6 +25,7 @@ const navItems = [
   { label: "Repository Integration", to: "/repositories",  icon: <FolderGit size={20} />,       roles: ["normal", "premium", "admin"] },
   { label: "Scan",                 to: "/scan",             icon: <ScanSearch size={20} />,      roles: ["normal", "premium", "admin"] },
   { label: "Attack Surface",       to: "/attack-surface",  icon: <Crosshair size={20} />,       roles: ["normal", "premium", "admin"] },
+  { label: "Kill Chain",           to: "/kill-chain",      icon: <Skull size={20} />,           roles: ["normal", "premium", "admin"] },
   { label: "Graphs",               to: "/graphs",           icon: <Share2 size={20} />,          roles: ["normal", "premium", "admin"] },
   { label: "Patch Generator",      to: "/patches",          icon: <FileDiff size={20} />,        roles: ["premium", "admin"] },
   { label: "Reports",              to: "/reports",          icon: <FileBarChart size={20} />,    roles: ["normal", "premium", "admin"] },

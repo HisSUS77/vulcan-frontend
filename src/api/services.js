@@ -133,6 +133,11 @@ export const attackSurfaceService = {
   get: (scanId) => api.get(`/attack-surface/${scanId}`),
 };
 
+// ============= KILL CHAIN =============
+export const killChainService = {
+  get: (scanId) => api.get(`/kill-chain/${scanId}`),
+};
+
 // ============= ADMIN =============
 export const adminService = {
   listUsers: () => api.get("/admin/users"),

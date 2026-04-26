@@ -326,17 +326,7 @@ function GraphsPage() {
     ? `${durationSeconds.toFixed(2)}s`
     : "N/A";
 
-  // Node positions: vertical for path-only mode (sorted by line), circular for full graph
   const getNodePosition = (index, total, radius = 280) => {
-    if (showOnlyPath && total <= 12) {
-      // Top-to-bottom column — arrows always flow downward
-      const top    = 70;
-      const bottom = 520;
-      const step   = total > 1 ? (bottom - top) / (total - 1) : 0;
-      // Alternate left/right slightly to avoid label overlap on adjacent nodes
-      const xOffset = (index % 2 === 0) ? 0 : 60;
-      return { x: 370 + xOffset, y: top + index * step };
-    }
     const angle = (2 * Math.PI * index) / total;
     return {
       x: 400 + radius * Math.cos(angle),
@@ -402,9 +392,7 @@ function GraphsPage() {
     let edgesToShow = displayGraphData.edges || [];
     if (showOnlyPath && vulnerablePath.size > 0) {
       nodesToShow = nodesToShow
-        .filter((node) => vulnerablePath.has(node.id))
-        // Sort by line number so top→bottom = code execution order
-        .sort((a, b) => (a.properties?.line || 0) - (b.properties?.line || 0));
+        .filter((node) => vulnerablePath.has(node.id));
       edgesToShow = edgesToShow.filter(
         (edge) => vulnerablePath.has(edge.from) && vulnerablePath.has(edge.to)
       );

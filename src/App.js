@@ -21,6 +21,7 @@ import RequireRole from "./components/RequireRole";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import BenchmarkPage from "./pages/BenchmarkPage";
 import AttackSurfacePage from "./pages/AttackSurfacePage";
+import KillChainPage from "./pages/KillChainPage";
 
 function App() {
   return (
@@ -135,6 +136,16 @@ function App() {
             <RequireAuth>
               <AppLayout>
                 <AttackSurfacePage />
+              </AppLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/kill-chain"
+          element={
+            <RequireAuth>
+              <AppLayout>
+                <KillChainPage />
               </AppLayout>
             </RequireAuth>
           }
