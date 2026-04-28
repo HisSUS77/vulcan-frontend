@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { attackSurfaceService, reportService } from "../api/services";
+import { attackSurfaceService } from "../api/services";
 
 /* ── constants ─────────────────────────────────────────────────────── */
 const RISK_COLOR  = { critical: "#ef4444", high: "#f97316", medium: "#eab308", low: "#22c55e", clean: "#22d3ee" };
@@ -188,18 +188,11 @@ export default function AttackSurfacePage() {
   const [selectedNode, setSelectedNode] = useState(null);
   const [hoveredNode,  setHoveredNode]  = useState(null);
 
-  /* resolve scan: URL param → lastScanId → user's own latest scan */
+  /* resolve scan: URL param → lastScanId (set when user opens/initiates a scan) */
   useEffect(() => {
     if (urlScanId) { setScanId(urlScanId); return; }
     const stored = localStorage.getItem("lastScanId");
-    if (stored) { setScanId(stored); return; }
-    reportService.list()
-      .then((res) => {
-        const reports = Array.isArray(res.data) ? res.data : [];
-        const latest  = reports[0];
-        if (latest?.scan_id) setScanId(latest.scan_id);
-      })
-      .catch(() => {});
+    if (stored) setScanId(stored);
   }, [urlScanId]);
 
   /* fetch */
@@ -210,20 +203,7 @@ export default function AttackSurfacePage() {
     attackSurfaceService
       .get(scanId)
       .then((res) => setData(res.data))
-      .catch((err) => {
-        // lastScanId belongs to another user — fall back to own latest scan
-        if (err?.response?.status === 403 || err?.response?.status === 404) {
-          reportService.list()
-            .then((res) => {
-              const latest = (Array.isArray(res.data) ? res.data : [])[0];
-              if (latest?.scan_id) setScanId(latest.scan_id);
-              else setError("No scans found.");
-            })
-            .catch(() => setError("Failed to load attack surface data."));
-        } else {
-          setError("Failed to load attack surface data.");
-        }
-      })
+      .catch(() => setError("Failed to load attack surface data."))
       .finally(() => setLoading(false));
   }, [scanId]);
 

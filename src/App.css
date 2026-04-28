@@ -3332,6 +3332,11 @@ body {
 .rp6-sev.medium { background: rgba(250, 204, 21, 0.2); color: #fef9c3; }
 .rp6-sev.low { background: rgba(74, 222, 128, 0.2); color: #bbf7d0; }
 
+.rp6-sev-btn-critical.active { background: rgba(248,113,113,0.2) !important; color: #fecaca !important; border-color: #f87171 !important; }
+.rp6-sev-btn-high.active     { background: rgba(249,115,22,0.2)  !important; color: #fed7aa !important; border-color: #f97316 !important; }
+.rp6-sev-btn-medium.active   { background: rgba(250,204,21,0.2)  !important; color: #fef9c3 !important; border-color: #facc15 !important; }
+.rp6-sev-btn-low.active      { background: rgba(74,222,128,0.2)  !important; color: #bbf7d0 !important; border-color: #4ade80 !important; }
+
 .rp6-mono {
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

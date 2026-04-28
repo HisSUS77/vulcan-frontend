@@ -19,6 +19,7 @@ export default function ReportsPage() {
   );
   const [scanSummary, setScanSummary] = useState(null);
   const [filterBy, setFilterBy] = useState("Severity");
+  const [severityFilter, setSeverityFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedVuln, setSelectedVuln] = useState(null);
@@ -74,13 +75,17 @@ export default function ReportsPage() {
   }, [normalizeVulns]);
 
   const filteredVulnerabilities = useMemo(() => {
+    let list = vulnerabilities;
     if (vulnView === "ai") {
-      return vulnerabilities.filter(
+      list = list.filter(
         (v) => (v.analysis?.llm_classification?.classification || v.llmClassification) === "VULNERABLE"
       );
     }
-    return vulnerabilities;
-  }, [vulnerabilities, vulnView]);
+    if (severityFilter !== "all") {
+      list = list.filter((v) => (v.severity || "").toLowerCase() === severityFilter);
+    }
+    return list;
+  }, [vulnerabilities, vulnView, severityFilter]);
 
   const filteredSummary = useMemo(() => {
     const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -476,12 +481,18 @@ export default function ReportsPage() {
                   AI-validated
                 </button>
               </div>
-              <span>Filter</span>
-              <select className="rp6-select" value={filterBy} onChange={(e) => setFilterBy(e.target.value)}>
-                <option value="Severity">Severity</option>
-                <option value="Status">Status</option>
-                <option value="CWE">CWE</option>
-              </select>
+              <div className="rp6-toggle">
+                {["all","critical","high","medium","low"].map((sev) => (
+                  <button
+                    key={sev}
+                    type="button"
+                    className={`rp6-toggle-btn ${severityFilter === sev ? "active" : ""} ${sev !== "all" ? `rp6-sev-btn-${sev}` : ""}`}
+                    onClick={() => setSeverityFilter(sev)}
+                  >
+                    {sev === "all" ? "All" : sev.charAt(0).toUpperCase() + sev.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="rp6-table-wrap">
