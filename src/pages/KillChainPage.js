@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { killChainService } from "../api/services";
+import { killChainService, reportService } from "../api/services";
 
 /* ── static style injection ─────────────────────────────────────────── */
 const STYLE = `
@@ -212,7 +212,6 @@ function StageTimeline({ stages, selectedId, onSelect }) {
           ))}
         </defs>
         {connectors.map((c, i) => {
-          const len = Math.hypot(c.x2 - c.x1, c.y2 - c.y1);
           return (
             <g key={i}>
               {/* Static dim line */}
@@ -381,8 +380,9 @@ function KillChains({ chains, stages }) {
 export default function KillChainPage() {
   const [searchParams] = useSearchParams();
   const navigate       = useNavigate();
-  const scanId         = searchParams.get("scanId") || localStorage.getItem("lastScanId");
+  const urlScanId      = searchParams.get("scanId");
 
+  const [scanId,     setScanId]     = useState(urlScanId || null);
   const [data,       setData]       = useState(null);
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState("");
@@ -398,6 +398,20 @@ export default function KillChainPage() {
     return () => document.head.removeChild(el);
   }, []);
 
+  /* resolve scan: URL param → lastScanId → user's own latest scan */
+  useEffect(() => {
+    if (urlScanId) { setScanId(urlScanId); return; }
+    const stored = localStorage.getItem("lastScanId");
+    if (stored) { setScanId(stored); return; }
+    reportService.list()
+      .then((res) => {
+        const reports = Array.isArray(res.data) ? res.data : [];
+        const latest  = reports[0];
+        if (latest?.scan_id) setScanId(latest.scan_id);
+      })
+      .catch(() => {});
+  }, [urlScanId]);
+
   useEffect(() => {
     if (!scanId) return;
     setLoading(true);
@@ -406,7 +420,20 @@ export default function KillChainPage() {
     killChainService
       .get(scanId)
       .then((res) => setData(res.data))
-      .catch(() => setError("Failed to load kill chain data."))
+      .catch((err) => {
+        // lastScanId belongs to another user — fall back to own latest scan
+        if (err?.response?.status === 403 || err?.response?.status === 404) {
+          reportService.list()
+            .then((res) => {
+              const latest = (Array.isArray(res.data) ? res.data : [])[0];
+              if (latest?.scan_id) setScanId(latest.scan_id);
+              else setError("No scans found.");
+            })
+            .catch(() => setError("Failed to load kill chain data."));
+        } else {
+          setError("Failed to load kill chain data.");
+        }
+      })
       .finally(() => setLoading(false));
   }, [scanId]);
 

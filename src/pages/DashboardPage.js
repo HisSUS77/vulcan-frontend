@@ -390,8 +390,8 @@ function DashboardPage() {
           <div className="v-recent-list">
             {recentScans.length > 0 ? (
               recentScans.slice(0, 3).map((scan, idx) => (
-                <div 
-                  key={idx} 
+                <div
+                  key={idx}
                   className="v-recent-item"
                   style={{ cursor: 'pointer' }}
                   onClick={() => handleLoadScan(scan.scan_id || scan.id)}
