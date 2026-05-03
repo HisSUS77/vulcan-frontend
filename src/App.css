@@ -10656,3 +10656,107 @@ body[data-theme="light"] textarea {
 
 /* Dashboard notifications */
 body[data-theme="light"] .v-notifications li { border-bottom-color: rgba(148,163,184,0.1) !important; color: #475569 !important; }
+
+/* ============================================================
+   LIGHT MODE — FIX PASS 2
+   Targets: scan banner+log, graph (gp-*), patch title+diff
+   ============================================================ */
+
+/* ── Topbar search in light mode ── */
+body[data-theme="light"] .v-search-wrap       { background: #f1f5f9 !important; border-color: rgba(148,163,184,0.4) !important; }
+body[data-theme="light"] .v-search-wrap input { background: transparent !important; color: #0f172a !important; }
+
+/* ── Scan — LAST SCAN resume banner ── */
+body[data-theme="light"] .vs-resume-banner {
+  background: #f1f5f9 !important;
+  border-color: rgba(14,165,233,0.25) !important;
+  color: #0f172a !important;
+}
+body[data-theme="light"] .vs-resume-banner strong { color: #0284c7 !important; }
+
+/* ── Scan — log list terminal area ── */
+body[data-theme="light"] .vs-log-list {
+  background: #f8fafc !important;
+  border-color: rgba(148,163,184,0.2) !important;
+  background-image: none !important;
+}
+body[data-theme="light"] .vs-log-text  { color: #374151 !important; }
+body[data-theme="light"] .vs-log-time  { color: #94a3b8 !important; }
+body[data-theme="light"] .vs-log-item  { border-bottom-color: rgba(148,163,184,0.1) !important; }
+
+/* ── Scan — file list ── */
+body[data-theme="light"] .vs-file-list         { background: #f8fafc !important; border-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .vs-file-list label   { color: #475569 !important; border-bottom-color: rgba(148,163,184,0.1) !important; }
+body[data-theme="light"] .vs-file-list label:hover { background: #e0f2fe !important; }
+
+/* ── Graph Visualization page (gp-*) ── */
+body[data-theme="light"] .gp-page              { background: #f0f4f8 !important; }
+body[data-theme="light"] .gp-header            { background: #ffffff !important; border-bottom-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .gp-header::after     { display: none !important; }
+body[data-theme="light"] .gp-title             { color: #0284c7 !important; text-shadow: none !important; animation: none !important; }
+body[data-theme="light"] .gp-title::before     { display: none !important; }
+body[data-theme="light"] .gp-title:hover       { animation: none !important; }
+body[data-theme="light"] .gp-scan-id           { color: #64748b !important; }
+body[data-theme="light"] .gp-scan-id code      { background: rgba(14,165,233,0.08) !important; border-color: rgba(14,165,233,0.2) !important; color: #0284c7 !important; }
+body[data-theme="light"] .gp-controls          { background: #f8fafc !important; border-bottom-color: rgba(148,163,184,0.2) !important; }
+body[data-theme="light"] .gp-canvas-area       { background: #e8edf4 !important; }
+body[data-theme="light"] .gp-side              { background: #ffffff !important; border-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .gp-type-label        { color: #64748b !important; }
+body[data-theme="light"] .gp-type-btn          { background: #f1f5f9 !important; border-color: rgba(148,163,184,0.3) !important; color: #475569 !important; }
+body[data-theme="light"] .gp-type-btn:hover:not(:disabled) { color: #0284c7 !important; border-color: #0284c7 !important; background: rgba(14,165,233,0.06) !important; }
+body[data-theme="light"] .gp-type-btn--active  { background: rgba(14,165,233,0.1) !important; border-color: #0284c7 !important; color: #0284c7 !important; box-shadow: 0 0 10px rgba(14,165,233,0.18) !important; }
+body[data-theme="light"] .gp-select            { background: #f8fafc !important; color: #0f172a !important; border-color: rgba(148,163,184,0.3) !important; }
+body[data-theme="light"] .gp-flow-btn          { background: #f1f5f9 !important; border-color: rgba(148,163,184,0.3) !important; color: #475569 !important; }
+body[data-theme="light"] .gp-flow-btn:hover    { border-color: #0284c7 !important; color: #0284c7 !important; }
+body[data-theme="light"] .gp-clear-btn         { background: #f1f5f9 !important; border-color: rgba(148,163,184,0.3) !important; color: #475569 !important; }
+body[data-theme="light"] .gp-clear-btn:hover   { background: #e0f2fe !important; border-color: #0284c7 !important; color: #0284c7 !important; }
+body[data-theme="light"] .gp-file-path         { color: #64748b !important; }
+body[data-theme="light"] .gp-stale-banner      { background: rgba(14,165,233,0.04) !important; border-color: rgba(14,165,233,0.2) !important; color: #475569 !important; }
+body[data-theme="light"] .gp-side-vuln-section { background: rgba(14,165,233,0.04) !important; border-color: rgba(14,165,233,0.1) !important; }
+body[data-theme="light"] .gp-side-vuln-title   { color: #64748b !important; }
+body[data-theme="light"] .gp-vuln-item         { background: #f8fafc !important; border-color: rgba(148,163,184,0.2) !important; color: #0f172a !important; }
+body[data-theme="light"] .gp-vuln-item:hover   { background: #e0f2fe !important; border-color: rgba(14,165,233,0.3) !important; }
+body[data-theme="light"] .gp-vuln-item-meta    { color: #64748b !important; }
+
+/* Graph old (gv-*) also needs canvas/card fix */
+body[data-theme="light"] .gv-graph-card        { background: #ffffff !important; border-color: rgba(148,163,184,0.22) !important; box-shadow: 0 4px 20px rgba(15,23,42,0.08) !important; }
+body[data-theme="light"] .gv-canvas            { background: #e8edf4 !important; border-color: rgba(148,163,184,0.2) !important; }
+body[data-theme="light"] .gv-grid-overlay      { display: none !important; }
+body[data-theme="light"] .gv-inspector-card    { background: #ffffff !important; border-color: rgba(148,163,184,0.22) !important; box-shadow: 0 4px 20px rgba(15,23,42,0.08) !important; }
+body[data-theme="light"] .gv-inspector-label   { color: #64748b !important; }
+body[data-theme="light"] .gv-code-block        { background: #f8fafc !important; border-color: rgba(148,163,184,0.25) !important; color: #0f172a !important; }
+body[data-theme="light"] .gv-legend            { background: rgba(248,250,252,0.95) !important; border-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .gv-graph-header-label { color: #0284c7 !important; }
+body[data-theme="light"] .gv-path-btn          { background: #f8fafc !important; border-color: rgba(148,163,184,0.3) !important; color: #0f172a !important; }
+body[data-theme="light"] .gv-export-group button { background: #f8fafc !important; border-color: rgba(148,163,184,0.3) !important; color: #0f172a !important; }
+body[data-theme="light"] .gv-inspector-hint    { color: #94a3b8 !important; }
+body[data-theme="light"] .gv-svg-node-label    { fill: rgba(51,65,85,0.9) !important; }
+
+/* ── Patch Generator — title & subtitle ── */
+body[data-theme="light"] .pg6-title    { color: #0f172a !important; text-shadow: none !important; }
+body[data-theme="light"] .pg6-title::before { display: none !important; }
+body[data-theme="light"] .pg6-subtitle { color: #475569 !important; }
+body[data-theme="light"] .pg6-kicker   { color: #0284c7 !important; }
+
+/* ── Patch Generator — diff panes ── */
+body[data-theme="light"] .pg6-diff-pane   { background: #f8fafc !important; border-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .pg6-diff-pane:first-child { border-left-color: rgba(249,115,22,0.5) !important; }
+body[data-theme="light"] .pg6-diff-pane:last-child  { border-left-color: rgba(14,165,233,0.5) !important; }
+body[data-theme="light"] .pg6-diff-header { background: #f1f5f9 !important; border-bottom-color: rgba(148,163,184,0.15) !important; }
+body[data-theme="light"] .pg6-diff-pane:first-child .pg6-diff-header { color: rgba(249,115,22,0.9) !important; }
+body[data-theme="light"] .pg6-diff-pane:last-child  .pg6-diff-header { color: rgba(14,165,233,0.9) !important; }
+body[data-theme="light"] .pg6-diff-body  { color: #374151 !important; }
+body[data-theme="light"] .pg6-line-no    { color: rgba(148,163,184,0.5) !important; }
+body[data-theme="light"] .pg6-line:hover { background: rgba(14,165,233,0.04) !important; }
+body[data-theme="light"] .pg6-line.added   { background: rgba(34,197,94,0.06) !important; border-left-color: rgba(34,197,94,0.6) !important; }
+body[data-theme="light"] .pg6-line.removed { background: rgba(249,115,22,0.06) !important; border-left-color: rgba(249,115,22,0.6) !important; }
+body[data-theme="light"] .pg6-copy-btn  { background: #f1f5f9 !important; border-color: rgba(148,163,184,0.35) !important; color: #64748b !important; }
+body[data-theme="light"] .pg6-copy-btn:hover:not(:disabled) { border-color: #0284c7 !important; color: #0284c7 !important; }
+body[data-theme="light"] .pg6-explain   { color: #374151 !important; border-left-color: rgba(14,165,233,0.3) !important; }
+
+/* ── Patch Generator — code shell ── */
+body[data-theme="light"] .pg6-code-shell { background: #f8fafc !important; border-color: rgba(148,163,184,0.25) !important; }
+body[data-theme="light"] .pg6-code       { color: #374151 !important; background: #f8fafc !important; }
+
+/* ── Patch Generator — no-scan placeholder ── */
+body[data-theme="light"] .pg6-no-scan-title { color: #0f172a !important; }
