@@ -389,7 +389,7 @@ function DashboardPage() {
           </header>
           <div className="v-recent-list">
             {recentScans.length > 0 ? (
-              recentScans.slice(0, 3).map((scan, idx) => (
+              recentScans.map((scan, idx) => (
                 <div
                   key={idx}
                   className="v-recent-item"
