@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 import { authService } from "../../api/services";
 import { getAccessToken, getCurrentUser, setCurrentUser, setAccessToken } from "../../api/client";
+import { useTheme } from "../../context/ThemeContext";
 
 // ==== MODERN ICONS (Lucide) ====
 import {
@@ -18,6 +19,8 @@ import {
   FlaskConical,
   Crosshair,
   Skull,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 const navItems = [
@@ -38,6 +41,7 @@ function AppLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const { theme, toggleTheme } = useTheme();
   const [search, setSearch] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -163,6 +167,16 @@ function AppLayout({ children }) {
       <div className="v-main">
         <header className="v-topbar">
           <div className="v-topbar-right">
+
+            {/* Theme toggle */}
+            <button
+              type="button"
+              className="v-theme-toggle"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
 
             {/* Search */}
             <div className="v-search-wrap">

@@ -2,6 +2,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import "./App.css";
+import { ThemeProvider } from "./context/ThemeContext";
 
 import LoginPage from "./pages/loginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -25,6 +26,7 @@ import KillChainPage from "./pages/KillChainPage";
 
 function App() {
   return (
+    <ThemeProvider>
     <Router>
       <Routes>
         {/* Public route */}
@@ -165,6 +167,7 @@ function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Router>
+    </ThemeProvider>
   );
 }
 
