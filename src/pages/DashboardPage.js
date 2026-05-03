@@ -407,6 +407,9 @@ function DashboardPage() {
                         {scan.created_at
                           ? new Date(scan.created_at).toLocaleDateString()
                           : "N/A"}
+                        {scan.scanned_by && (
+                          <span style={{ marginLeft: 8, opacity: 0.7 }}>· {scan.scanned_by}</span>
+                        )}
                       </p>
                     </div>
                   </div>
