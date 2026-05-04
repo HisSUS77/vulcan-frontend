@@ -423,7 +423,8 @@ function GraphsPage() {
       return;
     }
     setActiveScanId(null);
-  }, [scanId, navigate]); // removed activeFileId — it must not re-trigger this
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanId, navigate]); // activeFileId intentionally excluded — including it causes the fetch effect to re-run on every file switch
 
   useEffect(() => {
     if (fileId && fileId !== activeFileId) {
