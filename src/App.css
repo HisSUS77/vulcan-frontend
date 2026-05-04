@@ -640,6 +640,7 @@ body {
   display: grid;
   place-items: center;
   z-index: 1000;
+  pointer-events: none;
 }
 
 .v-invalid-token-card {
@@ -650,6 +651,7 @@ body {
   border-radius: 18px;
   padding: 28px 24px 24px;
   text-align: center;
+  pointer-events: auto;
 }
 
 .v-invalid-token-icon {

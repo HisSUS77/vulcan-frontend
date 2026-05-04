@@ -97,6 +97,29 @@ function AppLayout({ children }) {
     return () => window.removeEventListener("vulcan:invalid-token", handler);
   }, []);
 
+  useEffect(() => {
+    if (!invalidToken || !getAccessToken()) return;
+    let alive = true;
+
+    const recheckSession = async () => {
+      try {
+        const res = await authService.me();
+        if (!alive) return;
+        setUser(res.data);
+        setCurrentUser(res.data);
+        setInvalidToken(false);
+      } catch {
+        if (!alive) return;
+        setInvalidToken(true);
+      }
+    };
+
+    recheckSession();
+    return () => {
+      alive = false;
+    };
+  }, [invalidToken, location.pathname]);
+
   const handleRetryToken = async () => {
     try {
       const res = await authService.me();
@@ -111,6 +134,7 @@ function AppLayout({ children }) {
   const handleLogout = () => {
     setAccessToken(null);
     setCurrentUser(null);
+    localStorage.removeItem("lastScanId");
     navigate("/login", { replace: true });
   };
 
