@@ -257,6 +257,7 @@ export default function PatchGeneratorPage() {
       setPatches((prev) => [...prev, newP]);
       setSelectedPatch(newP);
       showToast(isRegen ? `ALT PATCH v${patches.length + 1} FORGED` : "PATCH SYNTHESIZED", "ok");
+      window.dispatchEvent(new CustomEvent("vulcan:patch-generated"));
     } catch (err) {
       const detail =
         err?.response?.data?.detail ||

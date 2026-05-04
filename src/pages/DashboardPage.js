@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "../App.css";
 import { dashboardService, notificationService, scanService } from "../api/services";
+import { getDashboardCache, setDashboardCache, markDashboardDirty } from "../cache/dashboardCache";
 
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
@@ -170,117 +171,84 @@ function DashboardPage() {
 
   useEffect(() => {
     let mounted = true;
-    const fetchData = async () => {
-      setError(null);
-      setRefreshing(true);
-      try {
-        const cachedSummary = localStorage.getItem("dashboard_summary_cache");
-        const cachedRecent = localStorage.getItem("dashboard_recent_cache");
-        if (mounted) {
-          if (cachedSummary) {
-            try { setSummary(JSON.parse(cachedSummary)); } catch {}
-          }
-          if (cachedRecent) {
-            try { setRecentScans(JSON.parse(cachedRecent)); } catch {}
-          }
-          if (cachedSummary || cachedRecent) {
-            setLoading(false);
-          }
-        }
+    const cache = getDashboardCache();
 
-        const lastScanId = localStorage.getItem("lastScanId");
-        if (lastScanId) {
-          const cached = localStorage.getItem(`scan_${lastScanId}`);
-          if (cached) {
-            try {
-              if (mounted) {
-                setRecentScans([JSON.parse(cached)]);
-              }
-            } catch {
-              // ignore cache parsing failures
-            }
-          }
-        }
-        // Fetch all data in parallel, but handle individual failures gracefully
-        const results = await Promise.allSettled([
+    // ── Paint from cache instantly (no loading spinner on return visits) ──────
+    if (cache.summary)       { setSummary(cache.summary);             setLoading(false); }
+    if (cache.recentScans)   { setRecentScans(cache.recentScans);     setLoading(false); }
+    if (cache.patchStats)    { setPatchStats(cache.patchStats);       setPatchStatsLoading(false); }
+    if (cache.notifications) { setNotifications(cache.notifications);                    }
+
+    // Skip network fetch entirely if cache is fresh (scan/patch didn't happen)
+    if (!cache.dirty && cache.summary) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    // ── Background refresh (cache was dirty or empty) ─────────────────────────
+    const fetchAll = async () => {
+      setError(null);
+      if (!cache.summary) setLoading(true);   // first visit → show spinner
+      else setRefreshing(true);               // return visit → silent refresh
+
+      try {
+        const [summaryRes, recentRes, notifRes, patchRes] = await Promise.allSettled([
           dashboardService.getSummary(),
           dashboardService.getRecentScans(),
           notificationService.getNotifications(1, 10),
+          dashboardService.getPatchStats(),
         ]);
-        
-        // Handle summary
-        if (mounted && results[0].status === "fulfilled") {
-          setSummary(results[0].value.data);
-          localStorage.setItem("dashboard_summary_cache", JSON.stringify(results[0].value.data));
+
+        const updates = {};
+
+        if (summaryRes.status === "fulfilled") {
+          updates.summary = summaryRes.value.data;
+          if (mounted) setSummary(updates.summary);
         }
-        
-        // Handle recent scans
-        if (mounted && results[1].status === "fulfilled") {
-          setRecentScans(results[1].value.data || []);
-          localStorage.setItem("dashboard_recent_cache", JSON.stringify(results[1].value.data || []));
+        if (recentRes.status === "fulfilled") {
+          updates.recentScans = recentRes.value.data || [];
+          if (mounted) setRecentScans(updates.recentScans);
+        }
+        if (notifRes.status === "fulfilled") {
+          const d = notifRes.value.data;
+          updates.notifications = d?.items || d || [];
+          if (mounted) setNotifications(updates.notifications);
+        }
+        if (patchRes.status === "fulfilled") {
+          updates.patchStats = patchRes.value.data;
+          if (mounted) { setPatchStats(updates.patchStats); setPatchStatsLoading(false); }
         } else {
-          // Try localStorage fallback for scans
-          const lastScanId = localStorage.getItem("lastScanId");
-          if (lastScanId) {
-            const cached = localStorage.getItem(`scan_${lastScanId}`);
-            if (cached) {
-              if (mounted) {
-                setRecentScans([JSON.parse(cached)]);
-              }
-            }
-          }
+          if (mounted) setPatchStatsLoading(false);
         }
-        
-        // Handle notifications
-        if (mounted && results[2].status === "fulfilled") {
-          const notifData = results[2].value.data;
-          setNotifications(notifData?.items || notifData || []);
-        }
-        
-        // Check if all failed
-        const allFailed = results.every(r => r.status === "rejected");
-        if (allFailed) {
-          const err = results[0].reason;
-          if (mounted) {
-            setError(err?.userMessage || "Failed to load dashboard data. Please check if the backend is running.");
-          }
+
+        // Persist fresh data to cache
+        setDashboardCache(updates);
+
+        const allFailed = [summaryRes, recentRes, notifRes, patchRes].every(r => r.status === "rejected");
+        if (allFailed && mounted) {
+          setError(summaryRes.reason?.userMessage || "Failed to load dashboard data.");
         }
       } catch (err) {
-        console.error("Failed to fetch dashboard data:", err);
-        if (mounted) {
-          setError(err?.userMessage || "Failed to load dashboard data.");
-        }
+        if (mounted) setError(err?.userMessage || "Failed to load dashboard data.");
       } finally {
-        if (mounted) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+        if (mounted) { setLoading(false); setRefreshing(false); }
       }
     };
 
-    // Fetch live patch stats separately (lightweight, fast)
-    const fetchPatchStats = async () => {
-      if (!mounted) return;
-      try {
-        const res = await dashboardService.getPatchStats();
-        if (mounted) {
-          setPatchStats(res.data);
-          setPatchStatsLoading(false);
-        }
-      } catch {
-        if (mounted) setPatchStatsLoading(false);
-      }
-    };
+    fetchAll();
 
-    fetchData();
-    fetchPatchStats();
-
-    // Poll patch stats every 30 seconds for live updates
-    patchPollRef.current = setInterval(fetchPatchStats, 30000);
+    // Listen for invalidation events fired mid-session (e.g. scan completes
+    // while user is on a different page then navigates back to dashboard)
+    const onInvalidate = () => { markDashboardDirty(); fetchAll(); };
+    window.addEventListener("vulcan:scan-started",    onInvalidate);
+    window.addEventListener("vulcan:patch-generated", onInvalidate);
 
     return () => {
       mounted = false;
       if (patchPollRef.current) clearInterval(patchPollRef.current);
+      window.removeEventListener("vulcan:scan-started",    onInvalidate);
+      window.removeEventListener("vulcan:patch-generated", onInvalidate);
     };
   }, []);
 

@@ -345,6 +345,7 @@ function ScanPage() {
       setScanSummary(null);
       setToast("");
       localStorage.setItem("lastScanId", res.data.scan_id);
+      window.dispatchEvent(new CustomEvent("vulcan:scan-started"));
     } catch (err) {
       console.error("Failed to start scan:", err);
       const errorMessage = err.response?.data?.detail 
