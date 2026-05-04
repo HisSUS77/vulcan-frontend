@@ -275,6 +275,8 @@ export default function AttackSurfacePage() {
   }
 
   const { nodes, edges, stats } = data;
+  const totalFiles = stats?.total_nodes ?? stats?.total ?? nodes.length;
+  const totalVulnerabilities = stats?.total_vulnerabilities ?? nodes.reduce((sum, node) => sum + (node.vuln_count || 0), 0);
 
   /* ── main render ── */
   return (
@@ -293,8 +295,12 @@ export default function AttackSurfacePage() {
 
         <div className="asm-stats-bar">
           <div className="asm-stat">
-            <div className="asm-stat-num">{stats.total}</div>
-            <div className="asm-stat-label">Nodes</div>
+            <div className="asm-stat-num">{totalFiles}</div>
+            <div className="asm-stat-label">Files</div>
+          </div>
+          <div className="asm-stat">
+            <div className="asm-stat-num">{totalVulnerabilities}</div>
+            <div className="asm-stat-label">Vulns</div>
           </div>
           {["critical", "high", "medium", "low"].map((r) =>
             stats[r] > 0 ? (
@@ -304,10 +310,6 @@ export default function AttackSurfacePage() {
               </div>
             ) : null
           )}
-          <div className="asm-stat">
-            <div className="asm-stat-num">{edges.length}</div>
-            <div className="asm-stat-label">Edges</div>
-          </div>
         </div>
       </div>
 
