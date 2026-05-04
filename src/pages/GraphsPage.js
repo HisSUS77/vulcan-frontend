@@ -493,7 +493,6 @@ function GraphsPage() {
       return;
     }
 
-    let alive = true;
     inflightKeyRef.current = fetchKey;
 
     async function fetchGraph() {
@@ -501,9 +500,9 @@ function GraphsPage() {
         setLoading(true);
         setError(null);
         const response = await graphService.getGraph(activeScanId, activeFileId, requestedGraphType);
-        if (!alive || inflightKeyRef.current !== fetchKey) return;
+        // A newer fetch started — discard this stale response
+        if (inflightKeyRef.current !== fetchKey) return;
         const data = response.data || response;
-        // Store in cache before setting state
         graphCacheRef.current[fetchKey] = data;
         setGraphData(data);
         const files = Array.isArray(data?.file?.available_files) ? data.file.available_files : [];
@@ -514,18 +513,20 @@ function GraphsPage() {
           navigate(`/graphs?scanId=${activeScanId}&fileId=${data.file.file_id}`, { replace: true });
         }
       } catch (err) {
-        if (!alive) return;
+        if (inflightKeyRef.current !== fetchKey) return;
         console.error("Failed to fetch graph:", err);
         setGraphData(null);
         setError("Trace data is not available for this scan yet.");
       } finally {
-        if (alive) setLoading(false);
+        // Always clear loading — never leave the spinner stuck
+        setLoading(false);
         if (inflightKeyRef.current === fetchKey) inflightKeyRef.current = null;
       }
     }
 
     fetchGraph();
-    return () => { alive = false; };
+    // Cleanup: mark this key as superseded so the in-flight fetch discards its response
+    return () => { inflightKeyRef.current = null; };
   }, [activeFileId, activeScanId, navigate, requestedGraphType]);
 
   useEffect(() => {
