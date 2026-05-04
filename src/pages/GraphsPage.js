@@ -402,7 +402,14 @@ function GraphsPage() {
   const [error, setError] = useState(null);
   const [vulnView, setVulnView] = useState("all");
   const lineRefs = useRef({});
-  const requestedGraphType = viewMode === "full" ? graphType : "CPG";
+  const requestedGraphType = useMemo(
+    () => (viewMode === "full" ? graphType : "CPG"),
+    [viewMode, graphType]
+  );
+  // Tracks the fetch key currently in-flight so duplicate effect runs are skipped
+  const inflightKeyRef = useRef(null);
+  // Module-level graph cache: key → data
+  const graphCacheRef = useRef({});
 
   useEffect(() => {
     if (scanId) {
@@ -416,7 +423,7 @@ function GraphsPage() {
       return;
     }
     setActiveScanId(null);
-  }, [scanId, navigate, activeFileId]);
+  }, [scanId, navigate]); // removed activeFileId — it must not re-trigger this
 
   useEffect(() => {
     if (fileId && fileId !== activeFileId) {
@@ -470,38 +477,55 @@ function GraphsPage() {
 
   useEffect(() => {
     if (!activeScanId) return;
+
+    const fetchKey = `${activeScanId}|${activeFileId}|${requestedGraphType}`;
+
+    // Skip if this exact request is already in flight
+    if (inflightKeyRef.current === fetchKey) return;
+
+    // Serve from cache immediately — no spinner, no network call
+    if (graphCacheRef.current[fetchKey]) {
+      const cached = graphCacheRef.current[fetchKey];
+      setGraphData(cached);
+      setAvailableFiles(Array.isArray(cached?.file?.available_files) ? cached.file.available_files : []);
+      setActiveFilePath(cached?.file?.file_path || null);
+      setLoading(false);
+      return;
+    }
+
     let alive = true;
+    inflightKeyRef.current = fetchKey;
 
     async function fetchGraph() {
       try {
         setLoading(true);
         setError(null);
         const response = await graphService.getGraph(activeScanId, activeFileId, requestedGraphType);
-        if (!alive) return;
+        if (!alive || inflightKeyRef.current !== fetchKey) return;
         const data = response.data || response;
+        // Store in cache before setting state
+        graphCacheRef.current[fetchKey] = data;
         setGraphData(data);
         const files = Array.isArray(data?.file?.available_files) ? data.file.available_files : [];
         setAvailableFiles(files);
         setActiveFilePath(data?.file?.file_path || null);
-        if (activeFileId === "main" && data?.file?.file_id && data.file.file_id !== activeFileId) {
+        if (activeFileId === "main" && data?.file?.file_id && data.file.file_id !== "main") {
           setActiveFileId(data.file.file_id);
           navigate(`/graphs?scanId=${activeScanId}&fileId=${data.file.file_id}`, { replace: true });
         }
       } catch (err) {
+        if (!alive) return;
         console.error("Failed to fetch graph:", err);
         setGraphData(null);
         setError("Trace data is not available for this scan yet.");
       } finally {
-        if (alive) {
-          setLoading(false);
-        }
+        if (alive) setLoading(false);
+        if (inflightKeyRef.current === fetchKey) inflightKeyRef.current = null;
       }
     }
 
     fetchGraph();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [activeFileId, activeScanId, navigate, requestedGraphType]);
 
   useEffect(() => {
