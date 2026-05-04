@@ -244,9 +244,10 @@ function DashboardPage() {
     window.addEventListener("vulcan:scan-started",    onInvalidate);
     window.addEventListener("vulcan:patch-generated", onInvalidate);
 
+    const pollTimer = patchPollRef.current;
     return () => {
       mounted = false;
-      if (patchPollRef.current) clearInterval(patchPollRef.current);
+      if (pollTimer) clearInterval(pollTimer);
       window.removeEventListener("vulcan:scan-started",    onInvalidate);
       window.removeEventListener("vulcan:patch-generated", onInvalidate);
     };
