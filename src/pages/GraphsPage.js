@@ -493,40 +493,42 @@ function GraphsPage() {
       return;
     }
 
+    // Prevent duplicate concurrent requests for the exact same data
+    if (inflightKeyRef.current === fetchKey) return;
     inflightKeyRef.current = fetchKey;
 
-    async function fetchGraph() {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await graphService.getGraph(activeScanId, activeFileId, requestedGraphType);
+    setLoading(true);
+    setError(null);
+
+    graphService.getGraph(activeScanId, activeFileId, requestedGraphType)
+      .then((response) => {
         // A newer fetch started — discard this stale response
         if (inflightKeyRef.current !== fetchKey) return;
+        inflightKeyRef.current = null;
         const data = response.data || response;
         graphCacheRef.current[fetchKey] = data;
         setGraphData(data);
-        const files = Array.isArray(data?.file?.available_files) ? data.file.available_files : [];
-        setAvailableFiles(files);
+        setAvailableFiles(Array.isArray(data?.file?.available_files) ? data.file.available_files : []);
         setActiveFilePath(data?.file?.file_path || null);
+        setLoading(false);
         if (activeFileId === "main" && data?.file?.file_id && data.file.file_id !== "main") {
           setActiveFileId(data.file.file_id);
           navigate(`/graphs?scanId=${activeScanId}&fileId=${data.file.file_id}`, { replace: true });
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         if (inflightKeyRef.current !== fetchKey) return;
+        inflightKeyRef.current = null;
         console.error("Failed to fetch graph:", err);
         setGraphData(null);
         setError("Trace data is not available for this scan yet.");
-      } finally {
-        // Always clear loading — never leave the spinner stuck
         setLoading(false);
-        if (inflightKeyRef.current === fetchKey) inflightKeyRef.current = null;
-      }
-    }
+      });
 
-    fetchGraph();
-    // Cleanup: mark this key as superseded so the in-flight fetch discards its response
-    return () => { inflightKeyRef.current = null; };
+    // No cleanup side-effects on the ref — a new effect with different deps
+    // will overwrite inflightKeyRef with its own key, causing this fetch to
+    // discard its response via the key-mismatch check above.
+    return () => {};
   }, [activeFileId, activeScanId, navigate, requestedGraphType]);
 
   useEffect(() => {
