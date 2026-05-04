@@ -50,6 +50,7 @@ function LoginPage() {
         localStorage.removeItem("pg_selectedVuln");
         localStorage.removeItem("pg_patches");
         localStorage.removeItem("pg_selectedPatch");
+        localStorage.removeItem("lastScanId");
         setAccessToken(data.access_token);
         try {
           const me = await authService.me();
