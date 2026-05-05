@@ -48,8 +48,6 @@ function GraphStage({
   viewMode,
 }) {
   const svgRef = useRef(null);
-  const dragStateRef = useRef(null);
-  const movedDuringDragRef = useRef(false);
   const graphNodes = useMemo(() => graphData?.nodes || [], [graphData]);
   const graphEdges = useMemo(() => graphData?.edges || [], [graphData]);
   const pathIds = useMemo(
@@ -176,109 +174,6 @@ function GraphStage({
   const pathArray = pathIds;
   const sourceId = pathArray[0];
   const sinkId = pathArray[pathArray.length - 1];
-  const [zoom, setZoom] = useState(viewMode === "full" ? 1 : 1.08);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-
-  useEffect(() => {
-    setZoom(viewMode === "full" ? 1 : 1.08);
-    setPan({ x: 0, y: 0 });
-  }, [viewMode, selectedVuln?.id, graphData?.file?.file_path]);
-
-  useEffect(() => {
-    const handleWindowPointerMove = (event) => {
-      if (!dragStateRef.current) return;
-      const dx = event.clientX - dragStateRef.current.startX;
-      const dy = event.clientY - dragStateRef.current.startY;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
-        movedDuringDragRef.current = true;
-      }
-      setPan({
-        x: dragStateRef.current.originX + dx,
-        y: dragStateRef.current.originY + dy,
-      });
-    };
-
-    const handleWindowPointerUp = () => {
-      const dragState = dragStateRef.current;
-      if (dragState?.pointerId != null && dragState?.element?.hasPointerCapture?.(dragState.pointerId)) {
-        dragState.element.releasePointerCapture(dragState.pointerId);
-      }
-      dragStateRef.current = null;
-      setIsDragging(false);
-      window.setTimeout(() => {
-        movedDuringDragRef.current = false;
-      }, 0);
-    };
-
-    window.addEventListener("pointermove", handleWindowPointerMove);
-    window.addEventListener("pointerup", handleWindowPointerUp);
-    window.addEventListener("pointercancel", handleWindowPointerUp);
-    return () => {
-      window.removeEventListener("pointermove", handleWindowPointerMove);
-      window.removeEventListener("pointerup", handleWindowPointerUp);
-      window.removeEventListener("pointercancel", handleWindowPointerUp);
-    };
-  }, []);
-
-  useEffect(() => {
-    const resetDragState = () => {
-      const dragState = dragStateRef.current;
-      if (dragState?.pointerId != null && dragState?.element?.hasPointerCapture?.(dragState.pointerId)) {
-        dragState.element.releasePointerCapture(dragState.pointerId);
-      }
-      dragStateRef.current = null;
-      setIsDragging(false);
-      movedDuringDragRef.current = false;
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        resetDragState();
-      }
-    };
-
-    window.addEventListener("blur", resetDragState);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => {
-      window.removeEventListener("blur", resetDragState);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-    };
-  }, []);
-
-  const applyZoom = (nextZoom) => {
-    setZoom(Math.max(0.45, Math.min(3.2, nextZoom)));
-  };
-
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return undefined;
-    const handleWheel = (event) => {
-      event.preventDefault();
-      const delta = event.deltaY < 0 ? 1.12 : 0.9;
-      setZoom((prev) => Math.max(0.45, Math.min(3.2, prev * delta)));
-    };
-    el.addEventListener("wheel", handleWheel, { passive: false });
-    return () => {
-      el.removeEventListener("wheel", handleWheel);
-    };
-  }, []);
-
-  const handlePointerDown = (event) => {
-    if (event.button !== 0) return;
-    if (event.target.closest && event.target.closest(".tx-node")) return;
-    event.currentTarget.setPointerCapture?.(event.pointerId);
-    dragStateRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      originX: pan.x,
-      originY: pan.y,
-      pointerId: event.pointerId,
-      element: event.currentTarget,
-    };
-    movedDuringDragRef.current = false;
-    setIsDragging(true);
-  };
 
   if (!graphNodes.length) {
     return (
@@ -291,25 +186,6 @@ function GraphStage({
 
   return (
     <div className="tx-graph-scroll">
-      <div className="tx-graph-controls">
-        <button type="button" className="tx-graph-control-btn" onClick={() => applyZoom(zoom * 1.16)}>
-          +
-        </button>
-        <button type="button" className="tx-graph-control-btn" onClick={() => applyZoom(zoom * 0.86)}>
-          -
-        </button>
-        <button
-          type="button"
-          className="tx-graph-control-btn tx-graph-control-btn--wide"
-          onClick={() => {
-            setZoom(viewMode === "full" ? 1 : 1.08);
-            setPan({ x: 0, y: 0 });
-          }}
-        >
-          Reset View
-        </button>
-        <span className="tx-graph-zoom-label">{Math.round(zoom * 100)}%</span>
-      </div>
       <svg
         ref={svgRef}
         width="100%"
@@ -327,11 +203,7 @@ function GraphStage({
         </defs>
 
         <rect width={positioned.width} height={positioned.height} fill="#08101d" rx="10" />
-        <g
-          transform={`translate(${pan.x} ${pan.y}) scale(${zoom})`}
-          onPointerDown={handlePointerDown}
-          style={{ transformOrigin: "center", cursor: isDragging ? "grabbing" : "grab" }}
-        >
+        <g>
         <g>
           {positioned.edges.map((edge, idx) => {
             const fromPos = positioned.positions.get(edge.from);
@@ -395,14 +267,7 @@ function GraphStage({
             const showLabel = showLabelsForAll || isPathNode || isSelected;
 
             return (
-              <g
-                key={node.id}
-                className="tx-node"
-                onClick={() => {
-                  if (movedDuringDragRef.current) return;
-                  onSelectNode(node);
-                }}
-              >
+              <g key={node.id} className="tx-node" onClick={() => onSelectNode(node)}>
                 {isSelected && (
                   <circle
                     cx={pos.x}
@@ -468,15 +333,7 @@ function GraphsPage() {
   const [error, setError] = useState(null);
   const [vulnView, setVulnView] = useState("all");
   const lineRefs = useRef({});
-  const requestedGraphType = useMemo(
-    () => (viewMode === "full" ? graphType : "CPG"),
-    [viewMode, graphType]
-  );
-  // Tracks the fetch key currently in-flight so duplicate effect runs are skipped
-  const inflightKeyRef = useRef(null);
-  // Module-level graph cache: key → data
-  const graphCacheRef = useRef({});
-  const autoFileSyncRef = useRef("");
+  const requestedGraphType = viewMode === "full" ? graphType : "CPG";
 
   useEffect(() => {
     if (scanId) {
@@ -485,18 +342,15 @@ function GraphsPage() {
     }
     const stored = localStorage.getItem("lastScanId");
     if (stored) {
-      setActiveScanId((prev) => prev || stored);
-      if (scanId !== stored) {
-        navigate(`/graphs?scanId=${stored}&fileId=${activeFileId}`, { replace: true });
-      }
+      setActiveScanId(stored);
+      navigate(`/graphs?scanId=${stored}&fileId=${activeFileId}`, { replace: true });
       return;
     }
     setActiveScanId(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanId, navigate]); // activeFileId intentionally excluded — including it causes the fetch effect to re-run on every file switch
+  }, [scanId, navigate, activeFileId]);
 
   useEffect(() => {
-    if (fileId && fileId !== activeFileId) {
+    if (fileId && fileId !== "main" && fileId !== activeFileId) {
       setActiveFileId(fileId);
     }
   }, [fileId, activeFileId]);
@@ -547,66 +401,38 @@ function GraphsPage() {
 
   useEffect(() => {
     if (!activeScanId) return;
+    let alive = true;
 
-    const fetchKey = `${activeScanId}|${activeFileId}|${requestedGraphType}`;
-
-    // Skip if this exact request is already in flight
-    if (inflightKeyRef.current === fetchKey) return;
-
-    // Serve from cache immediately — no spinner, no network call
-    if (graphCacheRef.current[fetchKey]) {
-      const cached = graphCacheRef.current[fetchKey];
-      const cachedFiles = Array.isArray(cached?.file?.available_files) ? cached.file.available_files : [];
-      const cachedPath = cached?.file?.file_path || null;
-      setGraphData((prev) => (prev === cached ? prev : cached));
-      setAvailableFiles((prev) => (prev === cachedFiles ? prev : cachedFiles));
-      setActiveFilePath((prev) => (prev === cachedPath ? prev : cachedPath));
-      setLoading(false);
-      return;
-    }
-
-    // Prevent duplicate concurrent requests for the exact same data
-    if (inflightKeyRef.current === fetchKey) return;
-    inflightKeyRef.current = fetchKey;
-
-    setLoading(true);
-    setError(null);
-
-    graphService.getGraph(activeScanId, activeFileId, requestedGraphType)
-      .then((response) => {
-        // A newer fetch started — discard this stale response
-        if (inflightKeyRef.current !== fetchKey) return;
-        inflightKeyRef.current = null;
+    async function fetchGraph() {
+      try {
+        setLoading(true);
+        setError(null);
+        const response = await graphService.getGraph(activeScanId, activeFileId, requestedGraphType);
+        if (!alive) return;
         const data = response.data || response;
-        graphCacheRef.current[fetchKey] = data;
         setGraphData(data);
-        setAvailableFiles(Array.isArray(data?.file?.available_files) ? data.file.available_files : []);
+        const files = Array.isArray(data?.file?.available_files) ? data.file.available_files : [];
+        setAvailableFiles(files);
         setActiveFilePath(data?.file?.file_path || null);
-        setLoading(false);
-        if (
-          activeFileId === "main" &&
-          data?.file?.file_id &&
-          data.file.file_id !== "main" &&
-          autoFileSyncRef.current !== `${activeScanId}|bootstrap|${data.file.file_id}`
-        ) {
-          autoFileSyncRef.current = `${activeScanId}|bootstrap|${data.file.file_id}`;
+        if (activeFileId === "main" && data?.file?.file_id && data.file.file_id !== activeFileId) {
           setActiveFileId(data.file.file_id);
           navigate(`/graphs?scanId=${activeScanId}&fileId=${data.file.file_id}`, { replace: true });
         }
-      })
-      .catch((err) => {
-        if (inflightKeyRef.current !== fetchKey) return;
-        inflightKeyRef.current = null;
+      } catch (err) {
         console.error("Failed to fetch graph:", err);
         setGraphData(null);
         setError("Trace data is not available for this scan yet.");
-        setLoading(false);
-      });
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    }
 
-    // No cleanup side-effects on the ref — a new effect with different deps
-    // will overwrite inflightKeyRef with its own key, causing this fetch to
-    // discard its response via the key-mismatch check above.
-    return () => {};
+    fetchGraph();
+    return () => {
+      alive = false;
+    };
   }, [activeFileId, activeScanId, navigate, requestedGraphType]);
 
   useEffect(() => {
@@ -614,9 +440,7 @@ function GraphsPage() {
     const vulnFile = selectedVuln.location?.file;
     if (!vulnFile) return;
     const match = availableFiles.find((file) => matchesFilePath(file.path, vulnFile));
-    const syncKey = match?.id ? `${activeScanId}|${selectedVuln.id}|${match.id}` : "";
-    if (match?.id && activeFileId !== match.id && autoFileSyncRef.current !== syncKey) {
-      autoFileSyncRef.current = syncKey;
+    if (match?.id && activeFileId === "main") {
       setActiveFileId(match.id);
       navigate(`/graphs?scanId=${activeScanId}&fileId=${match.id}`, { replace: true });
     }
