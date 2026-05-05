@@ -1,6 +1,6 @@
 // src/components/layout/AppLayout.js
 import React, { useEffect, useRef, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import "../../App.css";
 import { authService } from "../../api/services";
 import { getAccessToken, getCurrentUser, setCurrentUser, setAccessToken } from "../../api/client";
@@ -37,7 +37,7 @@ const navItems = [
 ];
 
 
-function AppLayout({ children }) {
+function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -276,7 +276,7 @@ function AppLayout({ children }) {
           </div>
         </header>
 
-        <main className="v-content">{children}</main>
+        <main className="v-content"><Outlet /></main>
       </div>
     </div>
   );

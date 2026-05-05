@@ -27,146 +27,63 @@ import KillChainPage from "./pages/KillChainPage";
 function App() {
   return (
     <ThemeProvider>
-    <Router>
-      <Routes>
-        {/* Public route */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+      <Router>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
 
-        {/* Layout-wrapped routes (later we can add auth guard) */}
-        <Route
-          path="/dashboard"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <DashboardPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/scan"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <ScanPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/repositories"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <RepoIntegrationPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/graphs"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <GraphsPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/patches"
-          element={
-            <RequireAuth>
-              <RequireRole
-                roles={["premium", "admin"]}
-                fallback={
-                  <AppLayout>
+          {/* Authenticated routes — single shared AppLayout, never remounts on navigation */}
+          <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
+            <Route path="/dashboard"     element={<DashboardPage />} />
+            <Route path="/scan"          element={<ScanPage />} />
+            <Route path="/repositories"  element={<RepoIntegrationPage />} />
+            <Route path="/graphs"        element={<GraphsPage />} />
+            <Route path="/attack-surface" element={<AttackSurfacePage />} />
+            <Route path="/kill-chain"    element={<KillChainPage />} />
+            <Route path="/reports"       element={<ReportsPage />} />
+            <Route path="/account"       element={<AccountPage />} />
+
+            <Route
+              path="/patches"
+              element={
+                <RequireRole
+                  roles={["premium", "admin"]}
+                  fallback={
                     <div className="v-placeholder-page">
                       Patch generation is a premium feature. Upgrade to Premium to unlock patch suggestions.
                     </div>
-                  </AppLayout>
-                }
-              >
-                <AppLayout>
+                  }
+                >
                   <PatchGeneratorPage />
-                </AppLayout>
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/reports"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <ReportsPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/admin/users"
-          element={
-            <RequireAuth>
-              <RequireRole roles={["admin"]}>
-                <AppLayout>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <RequireRole roles={["admin"]}>
                   <AdminUsersPage />
-                </AppLayout>
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/benchmark"
-          element={
-            <RequireAuth>
-              <RequireRole roles={["admin"]}>
-                <AppLayout>
+                </RequireRole>
+              }
+            />
+            <Route
+              path="/benchmark"
+              element={
+                <RequireRole roles={["admin"]}>
                   <BenchmarkPage />
-                </AppLayout>
-              </RequireRole>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/attack-surface"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <AttackSurfacePage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/kill-chain"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <KillChainPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/account"
-          element={
-            <RequireAuth>
-              <AppLayout>
-                <AccountPage />
-              </AppLayout>
-            </RequireAuth>
-          }
-        />
+                </RequireRole>
+              }
+            />
+          </Route>
 
-        {/* Default redirect: go to login */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </Router>
+          {/* Default redirect */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
     </ThemeProvider>
   );
 }

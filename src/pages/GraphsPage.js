@@ -3,6 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import "../App.css";
 import { graphService, scanService } from "../api/services";
 
+// Module-level cache: survives React route changes (unlike useRef), cleared on page reload
+const _graphCache = {};
+// Shared in-flight promises: if the same key is requested by a remounted component
+// it attaches to the existing promise instead of starting a duplicate fetch
+const _inflightFetches = {};
+
 const GRAPH_TYPES = ["AST", "CPG"];
 const VIEW_MODES = [
   { id: "trace", label: "Trace Only" },
@@ -40,7 +46,7 @@ function buildPathEdgeSet(pathIds) {
   return set;
 }
 
-function GraphStage({
+const GraphStage = React.memo(function GraphStage({
   graphData,
   selectedVuln,
   selectedNode,
@@ -310,7 +316,7 @@ function GraphStage({
       </svg>
     </div>
   );
-}
+});
 
 function GraphsPage() {
   const navigate = useNavigate();
@@ -332,6 +338,7 @@ function GraphsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [vulnView, setVulnView] = useState("all");
+  const [renderGraph, setRenderGraph] = useState(false);
   const lineRefs = useRef({});
   const requestedGraphType = viewMode === "full" ? graphType : "CPG";
 
@@ -403,13 +410,41 @@ function GraphsPage() {
     if (!activeScanId) return;
     let alive = true;
 
-    async function fetchGraph() {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await graphService.getGraph(activeScanId, activeFileId, requestedGraphType);
+    const fetchKey = `${activeScanId}|${activeFileId}|${requestedGraphType}`;
+
+    // Serve from module-level cache immediately — survives navigation
+    if (_graphCache[fetchKey]) {
+      const cached = _graphCache[fetchKey];
+      setGraphData(cached);
+      setAvailableFiles(Array.isArray(cached?.file?.available_files) ? cached.file.available_files : []);
+      setActiveFilePath(cached?.file?.file_path || null);
+      setLoading(false);
+      return () => { alive = false; };
+    }
+
+    setLoading(true);
+    setError(null);
+
+    // Reuse an in-flight promise for this key so a remounted component never
+    // starts a duplicate request — it simply subscribes to the same fetch
+    if (!_inflightFetches[fetchKey]) {
+      _inflightFetches[fetchKey] = graphService
+        .getGraph(activeScanId, activeFileId, requestedGraphType)
+        .then((response) => {
+          const data = response.data || response;
+          _graphCache[fetchKey] = data;
+          delete _inflightFetches[fetchKey];
+          return data;
+        })
+        .catch((err) => {
+          delete _inflightFetches[fetchKey];
+          throw err;
+        });
+    }
+
+    _inflightFetches[fetchKey]
+      .then((data) => {
         if (!alive) return;
-        const data = response.data || response;
         setGraphData(data);
         const files = Array.isArray(data?.file?.available_files) ? data.file.available_files : [];
         setAvailableFiles(files);
@@ -418,21 +453,17 @@ function GraphsPage() {
           setActiveFileId(data.file.file_id);
           navigate(`/graphs?scanId=${activeScanId}&fileId=${data.file.file_id}`, { replace: true });
         }
-      } catch (err) {
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!alive) return;
         console.error("Failed to fetch graph:", err);
         setGraphData(null);
         setError("Trace data is not available for this scan yet.");
-      } finally {
-        if (alive) {
-          setLoading(false);
-        }
-      }
-    }
+        setLoading(false);
+      });
 
-    fetchGraph();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [activeFileId, activeScanId, navigate, requestedGraphType]);
 
   useEffect(() => {
@@ -494,7 +525,18 @@ function GraphsPage() {
     });
     return lines;
   }, [pathNodes]);
-  const selectedLine = selectedNode?.properties?.line || selectedVuln?.location?.start_line || null;
+  const selectedLine = selectedNode?.properties?.line || selectedVuln?.location?.start_line || 1;
+
+  const codeWindow = useMemo(() => {
+    const total = codeLines.length;
+    if (!total) {
+      return { start: 1, end: 0, lines: [] };
+    }
+    const radius = 200;
+    const start = Math.max(1, selectedLine - radius);
+    const end = Math.min(total, selectedLine + radius);
+    return { start, end, lines: codeLines.slice(start - 1, end) };
+  }, [codeLines, selectedLine]);
 
   useEffect(() => {
     if (!selectedLine) return;
@@ -503,6 +545,44 @@ function GraphsPage() {
       el.scrollIntoView({ block: "center", behavior: "smooth" });
     }
   }, [selectedLine, fileContent]);
+
+  useEffect(() => {
+    if (!graphData) {
+      setRenderGraph(false);
+      return;
+    }
+    let alive = true;
+    setRenderGraph(false);
+
+    const schedule = (cb) => {
+      if (typeof requestIdleCallback !== "undefined") {
+        return requestIdleCallback(cb);
+      }
+      return setTimeout(cb, 0);
+    };
+
+    const cancel = (id) => {
+      if (typeof cancelIdleCallback !== "undefined") {
+        cancelIdleCallback(id);
+      } else {
+        clearTimeout(id);
+      }
+    };
+
+    const handle = schedule(() => {
+      if (alive) setRenderGraph(true);
+    });
+
+    const fallback = setTimeout(() => {
+      if (alive) setRenderGraph(true);
+    }, 120);
+
+    return () => {
+      alive = false;
+      cancel(handle);
+      clearTimeout(fallback);
+    };
+  }, [graphData, activeFileId, requestedGraphType]);
 
   const lineNodeMap = useMemo(() => {
     const map = new Map();
@@ -716,7 +796,7 @@ function GraphsPage() {
               <div className="gp-state-icon">{"// ERROR //"}</div>
               <div className="gp-state-text">{error}</div>
             </div>
-          ) : (
+          ) : renderGraph ? (
             <GraphStage
               graphData={graphData}
               selectedVuln={selectedVuln}
@@ -724,6 +804,11 @@ function GraphsPage() {
               onSelectNode={setSelectedNode}
               viewMode={viewMode}
             />
+          ) : (
+            <div className="gp-state">
+              <div className="gp-state-icon">PREPARING VIEW</div>
+              <div className="gp-state-sub">Optimizing trace render…</div>
+            </div>
           )}
         </section>
 
@@ -740,8 +825,8 @@ function GraphsPage() {
           </div>
           {fileContent ? (
             <div className="tx-code-scroll">
-              {codeLines.map((line, index) => {
-                const lineNumber = index + 1;
+              {codeWindow.lines.map((line, index) => {
+                const lineNumber = codeWindow.start + index;
                 const isVulnLine = selectedVuln?.location?.start_line === lineNumber;
                 const isPathLine = pathLines.has(lineNumber);
                 const isSelectedLine = selectedNode?.properties?.line === lineNumber;
