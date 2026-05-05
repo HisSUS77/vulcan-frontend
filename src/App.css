@@ -4067,7 +4067,15 @@ body {
 .v-sidebar,
 .v-main {
   position: relative;
-  z-index: 2;
+}
+
+.v-sidebar {
+  z-index: 5;
+}
+
+.v-main {
+  z-index: 1;
+  min-width: 0;
 }
 
 /* --- Sidebar --- */
@@ -10796,6 +10804,10 @@ body[data-theme="light"] .gp-vuln-item-meta    { color: #64748b !important; }
   height: auto;
   overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  min-width: 0;
 }
 
 .tx-summary-cards {

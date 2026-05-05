@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "../App.css";
-import { patchService, reportService, scanService, sandboxService } from "../api/services";
+import { patchService, reportService, scanService } from "../api/services";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const severityClass = (sev = "") =>
@@ -154,11 +154,11 @@ export default function PatchGeneratorPage() {
     catch { return null; }
   });
   const [verifyLoading, setVerifyLoading]     = useState(false);
-  const [sandboxResult, setSandboxResult]     = useState(() => {
-    try { return JSON.parse(localStorage.getItem("pg_sandboxResult") || "null"); }
-    catch { return null; }
-  });
-  const [sandboxLoading, setSandboxLoading]   = useState(false);
+  const sandboxResult = null;
+  const sandboxLoading = false;
+  const setSandboxLoading = () => {};
+  const setSandboxResult = () => {};
+  const sandboxService = { run: async () => ({ data: { confirmed: false } }) };
   const [historyOpen, setHistoryOpen]         = useState(false);
   const [toast, setToast]                     = useState({ msg: "", type: "ok" });
 
@@ -223,11 +223,6 @@ export default function PatchGeneratorPage() {
     if (verifyResult) localStorage.setItem("pg_verifyResult", JSON.stringify(verifyResult));
     else localStorage.removeItem("pg_verifyResult");
   }, [verifyResult]);
-  useEffect(() => {
-    if (sandboxResult) localStorage.setItem("pg_sandboxResult", JSON.stringify(sandboxResult));
-    else localStorage.removeItem("pg_sandboxResult");
-  }, [sandboxResult]);
-
   /* keep selectedVulnData in sync — do NOT auto-clear patch on vuln change */
   useEffect(() => {
     const v = vulnerabilities.find((x) => x.id === selectedVuln);
@@ -239,10 +234,8 @@ export default function PatchGeneratorPage() {
     setPatches([]);
     setSelectedPatch(null);
     setVerifyResult(null);
-    setSandboxResult(null);
     localStorage.removeItem("pg_selectedPatch");
     localStorage.removeItem("pg_verifyResult");
-    localStorage.removeItem("pg_sandboxResult");
     showToast("PATCH CLEARED", "ok");
   };
 
@@ -599,13 +592,6 @@ export default function PatchGeneratorPage() {
             >
               {verifyLoading ? "Verifying…" : "⟳ Verify Fix"}
             </button>
-            <button
-              className="pg6-sandbox-btn"
-              onClick={handleRunSandbox}
-              disabled={sandboxLoading}
-            >
-              {sandboxLoading ? "Running…" : "▶ Run in Sandbox"}
-            </button>
           </div>
 
           {/* Status card */}
@@ -865,7 +851,7 @@ export default function PatchGeneratorPage() {
       )}
 
       {/* ── Exploit Sandbox Terminal ── */}
-      {(sandboxResult || sandboxLoading) && (
+      {false && (
         <div className="pg6-sandbox-panel">
           <div className="pg6-sandbox-header">
             <span className="pg6-sandbox-icon">⬡</span>
