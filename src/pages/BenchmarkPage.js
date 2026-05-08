@@ -1,7 +1,6 @@
 // src/pages/BenchmarkPage.js
 import React, { useState, useEffect, useCallback } from "react";
 import { benchmarkService } from "../api/services";
-import "../App.css";
 
 const OUTCOME_COLOR = { TP: "#4ade80", FP: "#f87171", FN: "#fb923c", TN: "#94a3b8" };
 
@@ -112,7 +111,7 @@ function TestCasesTab({ onCasesLoaded }) {
           <option value="vulnerable">Vulnerable</option>
           <option value="safe">Safe</option>
         </select>
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         <button className="rp6-btn bm2-add-btn" onClick={() => setShowAdd(s => !s)}>
           {showAdd ? "✕ Cancel" : "+ Add Case"}
         </button>
@@ -137,7 +136,7 @@ function TestCasesTab({ onCasesLoaded }) {
             </select>
           </div>
           <textarea className="rp6-input bm2-textarea" rows={5} placeholder="Code snippet…" value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} required />
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex gap-2">
             <button className="rp6-btn rp6-btn-primary" type="submit" disabled={saving}>{saving ? "Saving…" : "Save Test Case"}</button>
           </div>
         </form>
@@ -148,7 +147,7 @@ function TestCasesTab({ onCasesLoaded }) {
         <div className="bm2-loading">Loading test cases…</div>
       ) : (
         <div className="rp6-table-wrap">
-          <table className="rp6-table" style={{ fontSize: 13 }}>
+          <table className="rp6-table text-[13px]">
             <thead>
               <tr>
                 <th>NAME</th>
@@ -181,7 +180,7 @@ function TestCasesTab({ onCasesLoaded }) {
           </table>
         </div>
       )}
-      <div style={{ fontSize: 12, color: "#475569", marginTop: 8 }}>{cases.length} test cases</div>
+      <div className="text-xs text-[#475569] mt-2">{cases.length} test cases</div>
     </div>
   );
 }
@@ -194,13 +193,13 @@ function ResultsTab({ latestResult }) {
 
   const r = latestResult;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Per-CWE */}
       {r.per_cwe?.length > 0 && (
         <div>
-          <div className="rp6-panel-title" style={{ marginBottom: 10 }}>Per-CWE Breakdown</div>
+          <div className="rp6-panel-title mb-[10px]">Per-CWE Breakdown</div>
           <div className="rp6-table-wrap">
-            <table className="rp6-table" style={{ fontSize: 13 }}>
+            <table className="rp6-table text-[13px]">
               <thead>
                 <tr>
                   <th>CWE</th><th>PRECISION</th><th>RECALL</th><th>F1</th><th>TP</th><th>FP</th><th>FN</th><th>TN</th>
@@ -228,9 +227,9 @@ function ResultsTab({ latestResult }) {
       {/* Per-case */}
       {r.case_results?.length > 0 && (
         <div>
-          <div className="rp6-panel-title" style={{ marginBottom: 10 }}>Per-Case Results</div>
-          <div className="rp6-table-wrap" style={{ maxHeight: 320 }}>
-            <table className="rp6-table" style={{ fontSize: 13 }}>
+          <div className="rp6-panel-title mb-[10px]">Per-Case Results</div>
+          <div className="rp6-table-wrap max-h-[320px]">
+            <table className="rp6-table text-[13px]">
               <thead>
                 <tr>
                   <th>NAME</th><th>CWE</th><th>LABEL</th><th>OUTCOME</th><th>DETECTED TYPE</th><th>CONFIDENCE</th>
@@ -274,9 +273,9 @@ function LeaderboardTab({ runVersion }) {
 
   return (
     <div>
-      <div className="rp6-panel-title" style={{ marginBottom: 10 }}>Model Comparison — ranked by best F1</div>
+      <div className="rp6-panel-title mb-[10px]">Model Comparison — ranked by best F1</div>
       <div className="rp6-table-wrap">
-        <table className="rp6-table" style={{ fontSize: 13 }}>
+        <table className="rp6-table text-[13px]">
           <thead>
             <tr>
               <th>#</th><th>MODEL</th><th>RUNS</th><th>BEST F1</th><th>AVG PRECISION</th><th>AVG RECALL</th><th>AVG F1</th><th>TREND</th><th>LAST RUN</th>
@@ -332,7 +331,7 @@ function HistoryTab({ runVersion }) {
   if (!runs.length) return <div className="bm2-loading">No runs yet.</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <div className="flex flex-col gap-[6px]">
       {runs.map(run => (
         <div key={run.id} className="bm2-history-item">
           <div className="bm2-history-row" onClick={() => openRun(run.id)}>
@@ -431,16 +430,16 @@ function FieldMetricsTab({ metrics, onMetricsReload }) {
   if (loading) return <div className="bm2-loading">Loading field findings…</div>;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {error && <div className="rp6-alert"><strong>Error:</strong> {error}</div>}
 
       {/* Field benchmark run scores */}
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div className="flex items-center gap-2 mb-2">
           <div className="rp6-panel-title">Field Benchmark Scores</div>
           {runResult && <span style={{ fontSize: 11, color: "#475569" }}>oracle-based · {runResult.total} real findings · precision = TP/(TP+FP) · recall N/A</span>}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="flex flex-wrap gap-2">
           {[
             { label: "Field Precision", value: runResult ? pct(runResult.precision) : "No run", color: "#4ade80" },
             { label: "FP Rate",         value: runResult ? pct(runResult.fp_rate)  : "—",      color: "#fb923c" },
@@ -463,9 +462,9 @@ function FieldMetricsTab({ metrics, onMetricsReload }) {
 
       {/* Confirmed findings table */}
       <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div className="flex items-center gap-[10px] mb-[10px]">
           <div className="rp6-panel-title">AI-Oracle Confirmed Findings</div>
-          <div style={{ flex: 1 }} />
+          <div className="flex-1" />
           <select className="rp6-select bm2-mini-select" value={filter} onChange={e => setFilter(e.target.value)}>
             <option value="all">All</option>
             <option value="confirmed">Confirmed</option>
@@ -488,7 +487,7 @@ function FieldMetricsTab({ metrics, onMetricsReload }) {
               : "No findings match the selected filter."}
           </div>
         ) : (
-          <div className="rp6-table-wrap" style={{ maxHeight: 340 }}>
+          <div className="rp6-table-wrap max-h-[340px]">
             <table className="rp6-table" style={{ fontSize: 12 }}>
               <thead>
                 <tr><th>VULN TYPE</th><th>CWE</th><th>SEV</th><th>ORACLE</th><th>CONFIDENCE</th><th>FILE</th><th>SCAN</th></tr>
@@ -509,7 +508,7 @@ function FieldMetricsTab({ metrics, onMetricsReload }) {
             </table>
           </div>
         )}
-        <div style={{ fontSize: 11, color: "#475569", marginTop: 6 }}>{visible.length} findings shown</div>
+        <div className="text-[11px] text-[#475569] mt-[6px]">{visible.length} findings shown</div>
       </div>
     </div>
   );
@@ -550,16 +549,16 @@ function SpotCheckTab({ onMetricsReload }) {
   const agreePct   = reviewed.length ? Math.round((agreed / reviewed.length) * 100) : null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div className="flex items-center gap-3 flex-wrap">
         <div>
           <div className="rp6-panel-title">Human Spot-Check Review</div>
           <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>
             10% of oracle decisions are randomly sampled here for human verification.
           </div>
         </div>
-        <div style={{ flex: 1 }} />
+        <div className="flex-1" />
         {agreePct != null && (
           <div style={{ fontSize: 13, color: "#a78bfa" }}>
             Human agreement: <strong>{agreePct}%</strong> ({agreed}/{reviewed.length})
@@ -579,7 +578,7 @@ function SpotCheckTab({ onMetricsReload }) {
           No spot-check items yet. They appear automatically once scans confirm findings.
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {items.map(item => (
             <div key={item.id} className="bm2-history-item">
               {/* Row summary */}
@@ -620,7 +619,7 @@ function SpotCheckTab({ onMetricsReload }) {
 
               {/* Expanded detail */}
               {expanded === item.id && (
-                <div className="bm2-history-detail" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div className="bm2-history-detail flex flex-col gap-[10px]">
                   <div style={{ fontSize: 12, color: "#93a4b8", lineHeight: 1.6 }}>
                     <strong style={{ color: "#e5e7eb" }}>Oracle reasoning:</strong> {item.oracle_reasoning || "No reasoning provided."}
                   </div>
@@ -734,7 +733,7 @@ export default function BenchmarkPage() {
             )}
           </div>
         </div>
-        <div className="rp6-exports" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        <div className="rp6-exports flex flex-col items-end gap-2">
           <button
             className="rp6-btn rp6-btn-primary bm2-run-btn"
             onClick={handleRun}
@@ -769,7 +768,7 @@ export default function BenchmarkPage() {
 
       {/* Error banner */}
       {runError && (
-        <div className="rp6-alert" style={{ marginBottom: 14 }}>
+        <div className="rp6-alert mb-[14px]">
           <strong>Run failed:</strong> {runError}
         </div>
       )}
@@ -854,7 +853,7 @@ export default function BenchmarkPage() {
             <span className="rp6-panel-title">
               {["Test Cases", "Results", "Leaderboard", "History", "Field Metrics", "Spot Check"][tab]}
             </span>
-            <div className="rp6-toggle" style={{ flexWrap: "wrap" }}>
+            <div className="rp6-toggle flex-wrap">
               {["Test Cases", "Results", "Leaderboard", "History", "Field Metrics", "Spot Check"].map((t, i) => (
                 <button
                   key={t}
@@ -911,7 +910,7 @@ export default function BenchmarkPage() {
             <div className="rp6-panel-header">
               <span className="rp6-panel-title">Quick Guide</span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 12, color: "#93a4b8", lineHeight: 1.6 }}>
+            <div className="flex flex-col gap-[10px] text-xs text-[#93a4b8] leading-relaxed">
               <div>
                 <strong style={{ color: "#e5e7eb" }}>1. Review test cases</strong><br />
                 Browse the 55 labeled code snippets covering 12 CWE categories.

@@ -1,6 +1,6 @@
 // src/pages/AccountPage.js
 import React, { useEffect, useState } from "react";
-import "../App.css";
+
 import { authService } from "../api/services";
 import { getCurrentUser, setCurrentUser } from "../api/client";
 
@@ -99,40 +99,27 @@ function AccountPage() {
 
         {loading && <div className="acct-muted">Loading profile...</div>}
         {error && <div className="acct-error">{error}</div>}
-        {toast && <div className="acct-muted" style={{ color: "#22c55e" }}>{toast}</div>}
+        {toast && <div className="acct-muted text-[#22c55e]">{toast}</div>}
 
         {!loading && !error && (
           <div className="acct-grid">
-            <div className="acct-row" style={{ alignItems: "center" }}>
+            <div className="acct-row items-center">
               <span className="acct-label">Profile photo</span>
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <div
-                  style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "50%",
-                    background: "#0f172a",
-                    border: "1px solid #1f2937",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
-                >
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-[#0f172a] border border-[#1f2937] flex items-center justify-center overflow-hidden">
                   {avatarUrl ? (
                     <img
                       src={avatarUrl}
                       alt="Profile"
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      className="w-full h-full object-cover"
                     />
                   ) : (
-                    <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>No photo</span>
+                    <span className="text-[#94a3b8] text-[0.8rem]">No photo</span>
                   )}
                 </div>
                 <label
                   htmlFor="avatar-upload"
-                  className="acct-refresh-btn"
-                  style={{ margin: 0 }}
+                  className="acct-refresh-btn m-0"
                 >
                   Upload
                 </label>
@@ -141,9 +128,9 @@ function AccountPage() {
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
-                  style={{ display: "none" }}
+                  className="hidden"
                 />
-                <span style={{ color: "#94a3b8", fontSize: "0.8rem" }}>PNG/JPG, max 2MB</span>
+                <span className="text-[#94a3b8] text-[0.8rem]">PNG/JPG, max 2MB</span>
               </div>
             </div>
             <div className="acct-row">
@@ -152,25 +139,17 @@ function AccountPage() {
             </div>
             <div className="acct-row">
               <span className="acct-label">Full name</span>
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
+              <div className="flex gap-3 items-center justify-end flex-1">
                 {isEditingName ? (
                   <input
                     type="text"
                     className="acct-value"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid #1f2937",
-                      borderRadius: "8px",
-                      padding: "8px 12px",
-                      color: "#e2e8f0",
-                      width: "100%",
-                      maxWidth: "320px",
-                    }}
+                    className="bg-transparent border border-[#1f2937] rounded-lg px-3 py-2 text-[#e2e8f0] w-full max-w-[320px]"
                   />
                 ) : (
-                  <span className="acct-value" style={{ textAlign: "right", flex: 1 }}>
+                  <span className="acct-value text-right flex-1">
                     {fullName || "-"}
                   </span>
                 )}
@@ -227,7 +206,7 @@ function AccountPage() {
             </div>
             <div className="acct-row">
               <span className="acct-label">Delete account</span>
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", justifyContent: "flex-end", flex: 1 }}>
+              <div className="flex gap-3 items-center justify-end flex-1">
                 {showDeleteConfirm ? (
                   <>
                     <button
@@ -262,7 +241,7 @@ function AccountPage() {
             {deleteNotice && (
               <div className="acct-row">
                 <span className="acct-label"></span>
-                <span className="acct-value" style={{ color: "#f59e0b" }}>{deleteNotice}</span>
+                <span className="acct-value text-[#f59e0b]">{deleteNotice}</span>
               </div>
             )}
           </div>

@@ -1,6 +1,6 @@
 // src/pages/AdminUsersPage.js
 import React, { useEffect, useState } from "react";
-import "../App.css";
+
 import { adminService } from "../api/services";
 
 function AdminUsersPage() {
@@ -74,14 +74,13 @@ function AdminUsersPage() {
         <div className="v-card-header">
           <h2>All Users</h2>
         </div>
-        <div style={{ padding: "0 1.5rem 1rem" }}>
+        <div className="px-6 pb-4">
           <input
             type="text"
             placeholder="Search by email"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            className="rv-filter-select"
-            style={{ width: "280px" }}
+            className="rv-filter-select w-[280px]"
           />
         </div>
 
@@ -120,7 +119,7 @@ function AdminUsersPage() {
                     <td>{u.created_at ? new Date(u.created_at).toLocaleString() : "-"}</td>
                     <td>
                       {pendingRole?.userId === u.id ? (
-                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <div className="flex gap-2">
                           <button className="rv-top-btn" onClick={confirmRoleChange} disabled={savingId === u.id}>
                             Confirm
                           </button>
@@ -129,7 +128,7 @@ function AdminUsersPage() {
                           </button>
                         </div>
                       ) : (
-                        <span style={{ color: "#94a3b8", fontSize: "0.85rem" }}>—</span>
+                        <span className="text-[#94a3b8] text-[0.85rem]">—</span>
                       )}
                     </td>
                   </tr>
