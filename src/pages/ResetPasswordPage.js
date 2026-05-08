@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { authService } from "../api/services";
-import "../App.css";
 
 function ResetPasswordPage() {
   const location = useLocation();
@@ -37,7 +36,7 @@ function ResetPasswordPage() {
           setTokenValid(false);
           setStatus({ type: "error", message: data?.message || "Invalid or expired reset token." });
         }
-      } catch (err) {
+      } catch {
         setTokenValid(false);
         setStatus({ type: "error", message: "Failed to validate reset token." });
       } finally {
@@ -71,31 +70,44 @@ function ResetPasswordPage() {
     }
   };
 
+  const inputCls =
+    "h-11 w-full rounded-[10px] border border-[#e5e7eb] px-3 text-sm outline-none bg-[#f9fafb] transition-all placeholder:text-[#9ca3af] focus:bg-white focus:border-blue-600 focus:shadow-[0_0_0_1px_rgba(37,99,235,0.3)]";
+
+  const alertCls =
+    status.type === "success"
+      ? "rounded-[10px] px-3 py-2.5 mb-3 text-[13px] bg-[#ecfdf3] text-[#166534] border border-[#bbf7d0]"
+      : "rounded-[10px] px-3 py-2.5 mb-3 text-[13px] bg-[#fef2f2] text-[#991b1b] border border-[#fecaca]";
+
   return (
-    <div className="lp-page">
-      <div className="lp-logo-wrap">
-        <div className="lp-logo-circle">
-          <img src="/logo.jpg" alt="VULCAN logo" className="lp-logo-img" />
+    <div className="min-h-screen flex flex-col items-center justify-start py-10 px-4 bg-[#f4f5fb]">
+      {/* Logo */}
+      <div className="flex flex-col items-center mb-8 mt-5">
+        <div className="w-[180px] h-[180px] rounded-full overflow-hidden bg-white flex items-center justify-center mb-3">
+          <img
+            src="/logo.jpg"
+            alt="VULCAN logo"
+            className="w-[140px] h-[140px] object-contain drop-shadow-[0_6px_16px_rgba(0,0,0,0.15)]"
+          />
         </div>
-        <div className="lp-logo-text">VULCAN</div>
+        <div className="text-[40px] tracking-[0.2em] font-bold">VULCAN</div>
       </div>
 
-      <div className="lp-card">
-        <h2 className="lp-card-title">Reset password</h2>
-        {validating ? (
-          <p className="lp-helper-text">Validating reset token...</p>
-        ) : null}
+      {/* Card */}
+      <div className="w-full max-w-[460px] bg-white rounded-[18px] shadow-[0_18px_45px_rgba(15,23,42,0.12)] pt-7 px-8 pb-8 max-[480px]:px-[18px] max-[480px]:py-[22px]">
+        <h2 className="mt-0 mb-[18px] text-2xl font-semibold">Reset password</h2>
 
-        {status.message ? (
-          <div className={`lp-alert lp-alert-${status.type}`}>
-            {status.message}
-          </div>
-        ) : null}
+        {validating && (
+          <p className="m-0 mb-3 text-[13px] text-[#6b7280]">Validating reset token...</p>
+        )}
+
+        {status.message && (
+          <div className={alertCls}>{status.message}</div>
+        )}
 
         {tokenValid ? (
-          <form className="lp-form" onSubmit={handleSubmit}>
-            <div className="lp-field">
-              <label htmlFor="password">New password</label>
+          <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="password" className="text-sm text-[#111827]">New password</label>
               <input
                 id="password"
                 name="password"
@@ -104,11 +116,12 @@ function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className={inputCls}
               />
             </div>
 
-            <div className="lp-field">
-              <label htmlFor="confirm">Confirm password</label>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="confirm" className="text-sm text-[#111827]">Confirm password</label>
               <input
                 id="confirm"
                 name="confirm"
@@ -117,17 +130,22 @@ function ResetPasswordPage() {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 required
+                className={inputCls}
               />
             </div>
 
-            <button type="submit" className="lp-primary-btn" disabled={loading}>
+            <button
+              type="submit"
+              className="mt-1.5 w-full h-[46px] rounded-full border-none bg-blue-600 text-white font-semibold text-[15px] cursor-pointer transition hover:bg-blue-700 hover:shadow-[0_10px_25px_rgba(37,99,235,0.35)] hover:-translate-y-px disabled:opacity-70 disabled:cursor-not-allowed"
+              disabled={loading}
+            >
               {loading ? "Updating..." : "Reset password"}
             </button>
           </form>
         ) : (
           <button
             type="button"
-            className="lp-link-btn"
+            className="mt-2.5 bg-transparent border-none p-0 text-blue-600 text-sm cursor-pointer hover:underline"
             onClick={() => navigate("/forgot-password")}
           >
             Request a new reset link

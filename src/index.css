@@ -1,7 +1,236 @@
-body {
-  margin: 0;
-  font-family: 'Rajdhani', system-ui, -apple-system, sans-serif;
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --neon-cyan:       #22d3ee;
+    --neon-cyan-dim:   rgba(34, 211, 238, 0.15);
+    --neon-cyan-mid:   rgba(34, 211, 238, 0.35);
+    --neon-cyan-full:  rgba(34, 211, 238, 0.8);
+    --neon-orange:     #f97316;
+    --neon-orange-dim: rgba(249, 115, 22, 0.15);
+    --neon-blue:       #0ea5e9;
+    --neon-blue-mid:   rgba(14, 165, 233, 0.25);
+    --grid-color:      rgba(34, 211, 238, 0.04);
+    --grid-size:       40px;
+    --font-display: 'Orbitron', sans-serif;
+    --font-body:    'Rajdhani', system-ui, sans-serif;
+    --font-mono:    'Share Tech Mono', 'Courier New', monospace;
+
+    --t-bg:           #020617;
+    --t-bg-2:         #0d1526;
+    --t-bg-hover:     #111827;
+    --t-bg-card:      #020617;
+    --t-bg-input:     #020617;
+    --t-bg-item:      #0f172a;
+    --t-text:         #e5e7eb;
+    --t-text-muted:   #9ca3af;
+    --t-text-dim:     #64748b;
+    --t-border:       rgba(31, 41, 55, 0.9);
+    --t-border-soft:  rgba(148, 163, 184, 0.15);
+    --t-border-med:   rgba(148, 163, 184, 0.5);
+    --t-shadow:       rgba(15, 23, 42, 0.8);
+  }
+
+  body[data-theme="light"] {
+    --t-bg:           #f0f4f8;
+    --t-bg-2:         #ffffff;
+    --t-bg-hover:     #e8edf4;
+    --t-bg-card:      #ffffff;
+    --t-bg-input:     #f8fafc;
+    --t-bg-item:      #f1f5f9;
+    --t-text:         #0f172a;
+    --t-text-muted:   #475569;
+    --t-text-dim:     #94a3b8;
+    --t-border:       rgba(148, 163, 184, 0.25);
+    --t-border-soft:  rgba(148, 163, 184, 0.15);
+    --t-border-med:   rgba(148, 163, 184, 0.4);
+    --t-shadow:       rgba(15, 23, 42, 0.08);
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--t-bg);
+    color: var(--t-text);
+  }
+
+  @keyframes v-fade-up {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes cyber-grid-pulse {
+    0%, 100% { opacity: 0.5; }
+    50%       { opacity: 1; }
+  }
+  @keyframes cyber-scanline {
+    0%   { transform: translateY(-100%); }
+    100% { transform: translateY(100vh); }
+  }
+  @keyframes v-psr-shimmer {
+    0%, 100% { opacity: 0.4; }
+    50%       { opacity: 0.8; }
+  }
+  @keyframes cyber-holo-shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+}
+
+@layer components {
+  /* Decorative cyber overlays — pseudo-elements & animations */
+  .v-grid-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: var(--grid-size) var(--grid-size);
+    background-position: 0 0;
+    animation: cyber-grid-pulse 6s ease-in-out infinite;
+    will-change: opacity;
+  }
+  .v-scanline-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .v-scanline-overlay::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(34,211,238,0) 10%,
+      rgba(34,211,238,0.06) 50%,
+      rgba(34,211,238,0) 90%,
+      transparent 100%
+    );
+    animation: cyber-scanline 12s linear infinite;
+    will-change: transform;
+  }
+
+  /* Dashboard cards — nth-child animation delays require real CSS */
+  .v-card {
+    background: radial-gradient(600px 180px at 10% 0%, rgba(59,130,246,0.12), transparent 60%), #020617;
+    border-radius: 18px;
+    border: 1px solid rgba(31,41,55,0.9);
+    padding: 16px 18px;
+    box-shadow: 0 18px 45px rgba(15,23,42,0.8);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    animation: v-fade-up 0.6s ease both;
+  }
+  .v-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 22px 55px rgba(15,23,42,0.9);
+  }
+  .v-row .v-card:nth-child(1)    { animation-delay: 0.05s; }
+  .v-row .v-card:nth-child(2)    { animation-delay: 0.12s; }
+  .v-row-bottom .v-card:nth-child(1) { animation-delay: 0.18s; }
+  .v-row-bottom .v-card:nth-child(2) { animation-delay: 0.24s; }
+  .v-row-bottom .v-card:nth-child(3) { animation-delay: 0.30s; }
+
+  .v-card-wide {
+    min-height: 190px;
+    padding: 14px 18px;
+  }
+  .v-card-wide canvas {
+    max-width: 140px !important;
+    max-height: 140px !important;
+  }
+  .v-card-header h2 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    letter-spacing: 0.2px;
+  }
+  .v-card-glow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(96,165,250,0.4);
+    box-shadow: 0 20px 40px rgba(59,130,246,0.18);
+  }
+  .v-card-glow-inner {
+    width: 100%; height: 100%;
+    border-radius: 20px;
+    background: radial-gradient(circle at top, #1bb3ff, #006aff);
+    box-shadow: 0 0 40px rgba(0,153,255,0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Gradient shimmer heading — background-clip text + ::before glitch */
+  .ri-heading {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, #c8d8f0 0%, var(--neon-cyan) 55%, #c8d8f0 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 200% auto;
+    animation: cyber-holo-shimmer 5s linear infinite;
+    margin: 6px 0 4px;
+    position: relative;
+    display: inline-block;
+  }
+  .ri-heading::before {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    color: var(--neon-cyan);
+    clip-path: inset(0 0 100% 0);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .ri-subheading {
+    margin: 0 0 6px;
+    color: rgba(148,163,184,0.75);
+    font-size: 13px;
+    letter-spacing: 0.4px;
+  }
+
+  /* Notifications bullet via ::before */
+  .v-notifications {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .v-notifications li::before {
+    content: "• ";
+    color: #22d3ee;
+  }
+
+  /* PSR SVG ring — stroke properties can't be Tailwind */
+  .v-psr-ring-bg {
+    fill: none;
+    stroke: rgba(34,211,238,0.1);
+    stroke-width: 7;
+  }
+  .v-psr-ring-fill {
+    fill: none;
+    stroke: url(#psrGradient);
+    stroke-width: 7;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .v-psr-loading {
+    animation: v-psr-shimmer 1.4s ease-in-out infinite;
+  }
 }
