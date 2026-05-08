@@ -1,7 +1,6 @@
 // src/pages/ScanPage.js
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import "../App.css";
 import { repositoryService, scanService } from "../api/services";
 import { api } from "../api/client";
 
@@ -513,7 +512,7 @@ function ScanPage() {
 
             {/* Conditional input fields */}
             {inputMode === "direct" && (
-              <div style={{ marginTop: "1rem" }}>
+              <div className="mt-4">
                 <div className="vs-field">
                   <div className="vs-label">Language</div>
                   <select
@@ -525,25 +524,19 @@ function ScanPage() {
                     <option value="javascript">JavaScript</option>
                   </select>
                 </div>
-                <div className="vs-field" style={{ marginTop: "1rem" }}>
-                  <div className="vs-label" style={{ display: "flex", justifyContent: "space-between" }}>
+                <div className="vs-field mt-4">
+                  <div className="vs-label flex justify-between">
                     <span>Enter Code (Max 400 lines)</span>
                     <span style={{ fontSize: "0.85rem", color: lineCountColor }}>
                       {lineCount} / 400 lines
                     </span>
                   </div>
                   <textarea
-                    className="vs-select"
+                    className="vs-select font-mono text-[0.9rem] resize-y min-h-[300px]"
                     value={directCode}
                     onChange={handleDirectCodeChange}
                     placeholder="Paste your code here..."
                     rows={15}
-                    style={{
-                      fontFamily: "monospace",
-                      fontSize: "0.9rem",
-                      resize: "vertical",
-                      minHeight: "300px"
-                    }}
                   />
                 </div>
               </div>
@@ -584,7 +577,7 @@ function ScanPage() {
                   </div>
                 </div>
 
-                <div className="vs-row-mode" style={{ marginTop: "1rem" }}>
+                <div className="vs-row-mode mt-4">
                   <div className="vs-label">Scan scope</div>
                   <div className="vs-mode-group">
                     <button
@@ -612,14 +605,14 @@ function ScanPage() {
                 </div>
 
                 {scanScope === "selected" && (
-                  <div className="vs-field" style={{ marginTop: "0.75rem" }}>
-                    <div className="vs-label" style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div className="vs-field mt-3">
+                    <div className="vs-label flex justify-between">
                       <span>Files to scan</span>
-                      <span style={{ fontSize: "0.85rem", color: "#888" }}>
+                      <span className="text-[0.85rem] text-[#888]">
                         {selectedFiles.length} selected
                       </span>
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <div className="flex gap-2 mb-2">
                       <button type="button" className="vs-save-config-btn" onClick={fetchRepoFiles}>
                         Refresh list
                       </button>
@@ -630,25 +623,18 @@ function ScanPage() {
                         Clear
                       </button>
                     </div>
-                    <div className="vs-file-list" style={{ padding: "0.5rem", maxHeight: "220px", overflow: "auto" }}>
-                      {repoFilesLoading && <div style={{ color: "#999" }}>Loading files...</div>}
-                      {repoFilesError && <div style={{ color: "#f97373" }}>{repoFilesError}</div>}
+                    <div className="vs-file-list p-2 max-h-[220px] overflow-auto">
+                      {repoFilesLoading && <div className="text-[#999]">Loading files...</div>}
+                      {repoFilesError && <div className="text-[#f97373]">{repoFilesError}</div>}
                       {!repoFilesLoading && !repoFilesError && repoFiles.length === 0 && (
-                        <div style={{ color: "#999" }}>No source files found.</div>
+                        <div className="text-[#999]">No source files found.</div>
                       )}
                       {!repoFilesLoading &&
                         !repoFilesError &&
                         repoFiles.map((path) => (
                           <label
                             key={path}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.5rem",
-                              padding: "0.25rem 0",
-                              color: "#cbd5f5",
-                              fontSize: "0.9rem",
-                            }}
+                            className="flex items-center gap-2 py-1"
                           >
                             <input
                               type="checkbox"
@@ -698,16 +684,16 @@ function ScanPage() {
                       <div className="vs-diff-result">
                         <div className="vs-diff-result-header">
                           <span>{diffFiles.length} changed file{diffFiles.length !== 1 ? "s" : ""} detected</span>
-                          <div style={{ display: "flex", gap: "6px" }}>
+                          <div className="flex gap-[6px]">
                             <button type="button" className="vs-save-config-btn" onClick={() => setSelectedFiles(diffFiles)}>All</button>
                             <button type="button" className="vs-save-config-btn" onClick={() => setSelectedFiles([])}>None</button>
                           </div>
                         </div>
-                        <div className="vs-file-list" style={{ maxHeight: "160px", overflow: "auto" }}>
+                        <div className="vs-file-list max-h-[160px] overflow-auto">
                           {diffFiles.length === 0
-                            ? <div style={{ color: "#888", padding: "6px 0" }}>No scannable files changed.</div>
+                            ? <div className="text-[#888] py-[6px]">No scannable files changed.</div>
                             : diffFiles.map((path) => (
-                              <label key={path} style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.2rem 0", color: "#cbd5f5", fontSize: "0.88rem" }}>
+                              <label key={path} className="flex items-center gap-2 py-[0.2rem]">
                                 <input
                                   type="checkbox"
                                   checked={selectedFiles.includes(path)}
@@ -872,7 +858,7 @@ function ScanPage() {
                 </div>
               ))}
               {logs.length === 0 && (
-                <div className="vs-log-item" style={{ opacity: 0.5 }}>
+                <div className="vs-log-item opacity-50">
                   <span className="vs-log-text">No logs yet. Start a scan to see results.</span>
                 </div>
               )}
@@ -881,9 +867,8 @@ function ScanPage() {
             <div className="vs-log-footer">
               <button
                 type="button"
-                className="vs-view-graph-btn"
+                className="vs-view-graph-btn mr-2"
                 onClick={handleViewGraph}
-                style={{ marginRight: '0.5rem' }}
               >
                 VIEW GRAPH
               </button>

@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { reportService, scanService } from "../api/services";
-import "../App.css";
 
 const FRAMEWORKS = [
   { value: "owasp",   label: "OWASP Top 10" },
@@ -640,7 +639,7 @@ export default function ReportsPage() {
 
             {complianceLoading && (
               <div className="rp6-compliance-loading">
-                <div className="rp6-cyber-loader-bar" style={{ width: "100%", margin: "12px 0" }} />
+                <div className="rp6-cyber-loader-bar w-full my-3" />
                 <span>Mapping vulnerabilities to {FRAMEWORKS.find(f=>f.value===complianceFramework)?.label} controls…</span>
               </div>
             )}
@@ -699,7 +698,7 @@ export default function ReportsPage() {
             })()}
 
             {!complianceData && !complianceLoading && (
-              <div className="rp6-muted" style={{ marginTop: "12px" }}>
+              <div className="rp6-muted mt-3">
                 Select a framework and run assessment to map scan findings to compliance controls.
               </div>
             )}

@@ -233,4 +233,241 @@
   .v-psr-loading {
     animation: v-psr-shimmer 1.4s ease-in-out infinite;
   }
+
+  /* ── ScanPage (vs-*) ── */
+  @keyframes vs-scan-pulse {
+    0%, 100% { box-shadow: 0 0 20px rgba(34,211,238,0.25), inset 0 0 15px rgba(34,211,238,0.04); }
+    50%       { box-shadow: 0 0 55px rgba(34,211,238,0.55), inset 0 0 28px rgba(34,211,238,0.1); }
+  }
+  @keyframes cyber-neon-pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .vs-header-status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 6px #22d3ee;
+    animation: cyber-neon-pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+
+  .vs-card {
+    background: rgba(3, 8, 22, 0.98);
+    border: 1px solid rgba(34, 211, 238, 0.12);
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+  }
+  .vs-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(34,211,238,0.35), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .vs-card::after {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 14px; height: 14px;
+    border-top: 1px solid rgba(34, 211, 238, 0.4);
+    border-right: 1px solid rgba(34, 211, 238, 0.4);
+  }
+  .vs-card:hover { border-color: rgba(34, 211, 238, 0.22); }
+  .vs-card:hover::before { opacity: 1; }
+
+  .vs-select {
+    background: rgba(2, 5, 16, 0.99);
+    border: 1px solid rgba(34, 211, 238, 0.18);
+    color: #e2e8f0;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .vs-select:focus {
+    outline: none;
+    border-color: #22d3ee;
+    box-shadow: 0 0 14px rgba(34, 211, 238, 0.15);
+  }
+  .vs-select::placeholder { color: rgba(100, 116, 139, 0.4); }
+
+  .vs-mode-btn {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(148, 163, 184, 0.6);
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+  .vs-mode-btn.active {
+    background: rgba(34, 211, 238, 0.1);
+    color: #22d3ee;
+    border: 1px solid rgba(34, 211, 238, 0.4);
+    box-shadow: 0 0 12px rgba(34, 211, 238, 0.18);
+  }
+  .vs-mode-btn:hover:not(.active) { color: #e2e8f0; }
+
+  .vs-start-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    background: linear-gradient(135deg, rgba(14,165,233,0.12), rgba(34,211,238,0.07));
+    border: 1px solid #22d3ee;
+    color: #22d3ee;
+    box-shadow: 0 0 30px rgba(34,211,238,0.22), inset 0 0 18px rgba(34,211,238,0.04);
+    transition: box-shadow 0.3s ease, transform 0.2s ease, color 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .vs-start-btn:hover { transform: translateY(-1px); color: #fff; }
+  .vs-start-btn.vs-scanning {
+    animation: vs-scan-pulse 1.4s ease-in-out infinite;
+    color: rgba(34, 211, 238, 0.8);
+  }
+
+  .vs-progress-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #22d3ee, #38bdf8);
+    box-shadow: 0 0 18px rgba(56, 189, 248, 0.85);
+  }
+
+  .vs-summary-mini-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #a855f7, #38bdf8);
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.6);
+  }
+
+  .vs-resume-banner { font-family: 'Share Tech Mono', 'Courier New', monospace; }
+  .vs-resume-banner strong { color: #22d3ee; }
+
+  .vs-file-list {
+    border: 1px solid rgba(34, 211, 238, 0.15);
+    background: rgba(2, 4, 14, 0.99);
+    border-radius: 8px;
+  }
+  .vs-file-list label {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 11px;
+    color: rgba(34, 211, 238, 0.7);
+    border-bottom: 1px solid rgba(34, 211, 238, 0.05);
+    transition: background 0.15s ease;
+  }
+  .vs-file-list label:hover { background: rgba(34, 211, 238, 0.05); }
+
+  .vs-log-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 999px;
+    margin-right: 6px;
+  }
+  .vs-log-dot.critical { background: #f97373; }
+
+  /* ── ReportsPage (rp6-*) ── */
+  .rp6-page {
+    background:
+      radial-gradient(circle at 20% 15%, rgba(59, 130, 246, 0.12), transparent 55%),
+      radial-gradient(circle at 80% 5%, rgba(249, 115, 22, 0.12), transparent 45%),
+      linear-gradient(180deg, #070a11, #0b1220 45%, #0a0c12);
+  }
+
+  .rp6-cyber-status {
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: rgba(34, 211, 238, 0.55);
+    text-transform: uppercase;
+  }
+  .rp6-cyber-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #22d3ee;
+    box-shadow: 0 0 6px #22d3ee;
+    animation: cyber-neon-pulse 2s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  .rp6-cyber-sep { opacity: 0.4; }
+
+  .rp6-cyber-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 80px 20px;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+    font-size: 11px;
+    color: #22d3ee;
+    text-transform: uppercase;
+  }
+  .rp6-cyber-loader-bar {
+    width: 200px; height: 2px;
+    background: rgba(34, 211, 238, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+  .rp6-cyber-loader-bar::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -60%; width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, #22d3ee, transparent);
+    animation: cyber-scanline 1.4s linear infinite;
+  }
+
+  .rp6-toggle-btn { transition: background 0.2s ease, color 0.2s ease; }
+  .rp6-toggle-btn.active { background: #1f2a44; color: #e5e7eb; }
+
+  .rp6-sev.critical { background: rgba(248, 113, 113, 0.2); color: #fecaca; }
+  .rp6-sev.high     { background: rgba(249, 115, 22, 0.2);  color: #fed7aa; }
+  .rp6-sev.medium   { background: rgba(250, 204, 21, 0.2);  color: #fef9c3; }
+  .rp6-sev.low      { background: rgba(74, 222, 128, 0.2);  color: #bbf7d0; }
+
+  .rp6-sev-btn-critical.active { background: rgba(248,113,113,0.2) !important; color: #fecaca !important; border-color: #f87171 !important; }
+  .rp6-sev-btn-high.active     { background: rgba(249,115,22,0.2)  !important; color: #fed7aa !important; border-color: #f97316 !important; }
+  .rp6-sev-btn-medium.active   { background: rgba(250,204,21,0.2)  !important; color: #fef9c3 !important; border-color: #facc15 !important; }
+  .rp6-sev-btn-low.active      { background: rgba(74,222,128,0.2)  !important; color: #bbf7d0 !important; border-color: #4ade80 !important; }
+
+  .rp6-status.generated    { background: rgba(34, 211, 238, 0.2); color: #a5f3fc; }
+  .rp6-status.validated    { background: rgba(34, 197, 94, 0.2);  color: #bbf7d0; }
+  .rp6-status.rejected     { background: rgba(248, 113, 113, 0.2); color: #fecaca; }
+  .rp6-status.applied_pending { background: rgba(250, 204, 21, 0.2); color: #fde68a; }
+  .rp6-status.approved     { background: rgba(59, 130, 246, 0.2); color: #bfdbfe; }
+  .rp6-status.applied      { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; }
+
+  .rp6-muted { color: #93a4b8; }
+
+  .rp6-detail {
+    position: relative;
+    overflow: hidden;
+    background:
+      radial-gradient(800px 240px at 15% 0%, rgba(59, 130, 246, 0.16), transparent 55%),
+      linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(6, 10, 20, 0.98));
+  }
+  .rp6-detail::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+  }
+
+  .rp6-compliance-score-val.pass { color: #22c55e; }
+  .rp6-compliance-score-val.warn { color: #f59e0b; }
+  .rp6-compliance-score-val.fail { color: #ef4444; }
+
+  .rp6-exploit-card {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    font-family: 'Share Tech Mono', 'Courier New', monospace;
+  }
+  .rp6-exploit-card.not-exploitable { border-color: rgba(34,197,94,0.2); background: rgba(34,197,94,0.02); }
+  .rp6-exploit-badge.exploitable     { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.5); color: #ef4444; }
+  .rp6-exploit-badge.not-exploitable { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.35); color: #22c55e; }
 }
