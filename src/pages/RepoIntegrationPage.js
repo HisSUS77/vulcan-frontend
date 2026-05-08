@@ -1,7 +1,7 @@
 // src/pages/RepoIntegrationPage.js
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import "../App.css";
+
 import { repositoryService } from "../api/services";
 
 const PROVIDERS = ["GITHUB", "LOCAL"];
@@ -182,7 +182,7 @@ function RepoIntegrationPage() {
   if (error) {
     return (
       <div className="ri-page">
-        <div style={{ color: "#f97373", marginBottom: "0.5rem", fontSize: "12px", letterSpacing: "1px", textTransform: "uppercase" }}>
+        <div className="text-[#f97373] mb-2 text-xs tracking-[1px] uppercase">
           ⚠ {error}
         </div>
         <button className="ri-add-btn" onClick={fetchRepositories}>
@@ -207,7 +207,7 @@ function RepoIntegrationPage() {
         <span>SECURE CHANNEL ACTIVE</span>
       </div>
 
-      {pageMessage && <div className="acct-error" style={{ marginBottom: "1rem" }}>{pageMessage}</div>}
+      {pageMessage && <div className="acct-error mb-4">{pageMessage}</div>}
 
       <div className="ri-shell">
         {/* Add new */}
@@ -360,7 +360,7 @@ function RepoIntegrationPage() {
             type="file"
             accept=".zip,.tar,.gz,.tar.gz"
             onChange={handleUpload}
-            style={{ display: "none" }}
+            className="hidden"
             disabled={uploading}
           />
         </div>
@@ -381,7 +381,7 @@ function RepoIntegrationPage() {
             <tbody>
               {repositories.length === 0 ? (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: "center", color: "#888" }}>
+                  <td colSpan="6" className="text-center text-[#888]">
                     No repositories found. Add one above or upload source code.
                   </td>
                 </tr>
@@ -432,9 +432,8 @@ function RepoIntegrationPage() {
                       </td>
                       <td className="ri-actions-cell">
                         <button
-                          className="ri-scan-link"
+                          className="ri-scan-link mr-2"
                           onClick={() => handleScanNow(repo.id)}
-                          style={{ marginRight: "0.5rem" }}
                           disabled={isRepoUrlMissing}
                           title={isRepoUrlMissing ? "Add a repository URL to scan." : "Scan"}
                         >
@@ -443,9 +442,8 @@ function RepoIntegrationPage() {
                         {confirmDeleteId === repo.id ? (
                           <>
                             <button
-                              className="ri-delete-link"
+                              className="ri-delete-link mr-2"
                               onClick={() => handleDelete(repo.id)}
-                              style={{ marginRight: "0.5rem" }}
                             >
                               Confirm
                             </button>
