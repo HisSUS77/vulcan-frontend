@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import "../App.css";
 import { graphService, scanService } from "../api/services";
 
 // Module-level cache: survives React route changes (unlike useRef), cleared on page reload

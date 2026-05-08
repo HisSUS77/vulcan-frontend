@@ -1,7 +1,6 @@
 // src/pages/PatchGeneratorPage.js
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import "../App.css";
 import { patchService, reportService, scanService } from "../api/services";
 
 /* ── helpers ─────────────────────────────────────────────────────────── */

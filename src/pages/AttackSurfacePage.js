@@ -1,7 +1,6 @@
 // src/pages/AttackSurfacePage.js
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import "../App.css";
 import { attackSurfaceService } from "../api/services";
 
 /* ── constants ─────────────────────────────────────────────────────── */
@@ -254,7 +253,7 @@ export default function AttackSurfacePage() {
   if (error) {
     return (
       <div className="asm-empty-page">
-        <div className="asm-empty-icon" style={{ color: "#ef4444" }}>⚠</div>
+        <div className="asm-empty-icon text-[#ef4444]">⚠</div>
         <div className="asm-empty-title">{error}</div>
         <div className="asm-empty-sub">Scan ID: {scanId}</div>
         <button className="asm-cta" onClick={() => navigate("/scan")}>RUN NEW SCAN</button>
@@ -361,11 +360,10 @@ export default function AttackSurfacePage() {
             return (
               <g
                 key={node.id}
-                className={`asm-node asm-node--${node.risk}${isDimmed ? " asm-node--dimmed" : ""}`}
+                className={`asm-node asm-node--${node.risk}${isDimmed ? " asm-node--dimmed" : ""} cursor-pointer`}
                 onClick={() => handleNodeClick(node)}
                 onMouseEnter={() => setHoveredNode(node)}
                 onMouseLeave={() => setHoveredNode(null)}
-                style={{ cursor: "pointer" }}
               >
                 {/* Selection ring */}
                 {isSelected && (
