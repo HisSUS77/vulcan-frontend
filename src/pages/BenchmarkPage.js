@@ -4,6 +4,20 @@ import { benchmarkService } from "../api/services";
 import "../App.css";
 
 const OUTCOME_COLOR = { TP: "#4ade80", FP: "#f87171", FN: "#fb923c", TN: "#94a3b8" };
+const TARGETED_CODEQL_ROOTS = [
+  "Security-python/CWE-089-SqlInjection",
+  "Security_ javascript/CWE-089",
+  "Security-python/CWE-078-CommandInjection",
+  "Security_ javascript/CWE-078",
+  "Security-python/CWE-079-XSS",
+  "Security_ javascript/CWE-079",
+  "Security-python/CWE-022-PathTraversal",
+  "Security_ javascript/CWE-022",
+  "Security-python/CWE-918-SSRF",
+  "Security_ javascript/CWE-918",
+  "Security-python/CWE-094-CodeInjection",
+  "Security_ javascript/CWE-094",
+];
 
 function OutcomePill({ outcome }) {
   const c = OUTCOME_COLOR[outcome] || "#94a3b8";
@@ -304,7 +318,7 @@ function LeaderboardTab({ runVersion }) {
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
-function HistoryTab({ runVersion }) {
+function HistoryTab({ runVersion, runType }) {
   const [runs, setRuns]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [expanded, setExpanded] = useState(null);
@@ -312,11 +326,11 @@ function HistoryTab({ runVersion }) {
 
   useEffect(() => {
     setLoading(true);
-    benchmarkService.listRuns(30)
+    benchmarkService.listRuns(30, runType)
       .then(r => setRuns(r.data || []))
       .catch(err => console.error("[Benchmark] history failed:", err))
       .finally(() => setLoading(false));
-  }, [runVersion]);
+  }, [runVersion, runType]);
 
   const openRun = async (id) => {
     if (expanded === id) { setExpanded(null); setDetail(null); return; }
@@ -661,6 +675,8 @@ export default function BenchmarkPage() {
   const [runVersion, setRunVersion] = useState(0);
   const [fieldMetrics, setFieldMetrics] = useState(null);
   const [enableLlm, setEnableLlm] = useState(false);
+  const [benchmarkMode, setBenchmarkMode] = useState("codeql-corpus");
+  const [benchmarkJob, setBenchmarkJob] = useState(null);
 
   const loadFieldMetrics = () => {
     benchmarkService.fieldMetrics()
@@ -670,7 +686,7 @@ export default function BenchmarkPage() {
 
   // Load most recent run + field metrics on mount
   useEffect(() => {
-    benchmarkService.listRuns(1)
+    benchmarkService.listRuns(1, "codeql-corpus")
       .then(r => { if (r.data?.length) setLastRun(r.data[0]); })
       .catch(() => {});
     loadFieldMetrics();
@@ -679,9 +695,36 @@ export default function BenchmarkPage() {
   const handleRun = async () => {
     setRunning(true);
     setRunError("");
+    setBenchmarkJob(null);
     try {
-      const res = await benchmarkService.runBenchmark(enableLlm);
-      setLastRun(res.data);
+      let run;
+      if (benchmarkMode === "codeql-corpus") {
+        const started = await benchmarkService.startCodeQLCorpusJob({
+          enableLlm,
+          supportedOnly: true,
+          roots: TARGETED_CODEQL_ROOTS,
+        });
+        setBenchmarkJob(started.data);
+
+        for (;;) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          const status = await benchmarkService.getBenchmarkJob(started.data.id);
+          setBenchmarkJob(status.data);
+
+          if (status.data.status === "completed") {
+            const runRes = await benchmarkService.getRun(status.data.run_id);
+            run = runRes.data;
+            break;
+          }
+          if (status.data.status === "failed") {
+            throw new Error(status.data.error || "Benchmark job failed.");
+          }
+        }
+      } else {
+        const res = await benchmarkService.runBenchmark(enableLlm);
+        run = res.data;
+      }
+      setLastRun(run);
       setRunVersion(v => v + 1);
       setTab(1);
     } catch (err) {
@@ -720,7 +763,7 @@ export default function BenchmarkPage() {
               </>
             ) : (
               <>
-                <span>BENCHMARK ACTIVE</span>
+                <span>{benchmarkMode === "codeql-corpus" ? "CODEQL CORPUS ACTIVE" : "SYNTHETIC BENCHMARK ACTIVE"}</span>
                 {totalCases != null && <><span className="rp6-cyber-sep">{"//"}</span><span>{totalCases} CASES LOADED</span></>}
                 {lastRun && (
                   <>
@@ -728,6 +771,8 @@ export default function BenchmarkPage() {
                     <span>LAST RUN: F1 {pct(lastRun.f1)}</span>
                     <span className="rp6-cyber-sep">{"//"}</span>
                     <span>{lastRun.model_used || "UNKNOWN MODEL"}</span>
+                    <span className="rp6-cyber-sep">{"//"}</span>
+                    <span>{lastRun.run_type || benchmarkMode}</span>
                   </>
                 )}
               </>
@@ -735,13 +780,35 @@ export default function BenchmarkPage() {
           </div>
         </div>
         <div className="rp6-exports" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          <select
+            className="rp6-select bm2-mini-select"
+            value={benchmarkMode}
+            onChange={e => {
+              const mode = e.target.value;
+              setBenchmarkMode(mode);
+              benchmarkService.listRuns(1, mode)
+                .then(r => setLastRun(r.data?.[0] || null))
+                .catch(() => setLastRun(null));
+            }}
+            disabled={running}
+            title="Benchmark dataset"
+          >
+            <option value="codeql-corpus">CodeQL Corpus</option>
+            <option value="synthetic">Legacy Synthetic</option>
+          </select>
           <button
             className="rp6-btn rp6-btn-primary bm2-run-btn"
             onClick={handleRun}
             disabled={running}
           >
-            {running ? <><span className="bm2-spinner" /> Running…</> : "▶ Run Benchmark"}
+            {running ? <><span className="bm2-spinner" /> Running…</> : benchmarkMode === "codeql-corpus" ? "▶ Run CodeQL Benchmark" : "▶ Run Legacy Benchmark"}
           </button>
+          {benchmarkJob && (
+            <div style={{ fontSize: 11, color: "#93a4b8", textAlign: "right", maxWidth: 260 }}>
+              Job {benchmarkJob.status}
+              {benchmarkJob.run_id ? ` · saved run ${benchmarkJob.run_id}` : ""}
+            </div>
+          )}
           {/* LLM toggle */}
           <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", userSelect: "none" }}>
             <div
@@ -868,7 +935,7 @@ export default function BenchmarkPage() {
           {tab === 0 && <TestCasesTab onCasesLoaded={setTotalCases} />}
           {tab === 1 && <ResultsTab latestResult={lastRun} />}
           {tab === 2 && <LeaderboardTab runVersion={runVersion} />}
-          {tab === 3 && <HistoryTab runVersion={runVersion} />}
+          {tab === 3 && <HistoryTab runVersion={runVersion} runType={benchmarkMode} />}
           {tab === 4 && <FieldMetricsTab metrics={fieldMetrics} onMetricsReload={loadFieldMetrics} />}
           {tab === 5 && <SpotCheckTab onMetricsReload={loadFieldMetrics} />}
         </div>
@@ -894,6 +961,7 @@ export default function BenchmarkPage() {
             ) : (
               <div className="rp6-scan-info">
                 <div><span>Model</span><strong>{lastRun?.model_used || "—"}</strong></div>
+                <div><span>Run Type</span><strong>{lastRun?.run_type || benchmarkMode}</strong></div>
                 <div><span>Status</span><strong style={{ color: lastRun ? "#4ade80" : "#475569" }}>{lastRun ? "COMPLETED" : "NOT RUN"}</strong></div>
                 <div><span>Total Cases</span><strong>{lastRun?.total ?? "—"}</strong></div>
                 <div><span>True Positives</span><strong style={{ color: "#4ade80" }}>{lastRun?.tp ?? "—"}</strong></div>
