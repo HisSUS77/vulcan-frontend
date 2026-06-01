@@ -150,7 +150,32 @@ export const benchmarkService = {
   createTestCase: (data) => api.post("/benchmark/test-cases", data),
   deleteTestCase: (id) => api.delete(`/benchmark/test-cases/${id}`),
   runBenchmark: (enableLlm = false) => api.post("/benchmark/run", { enable_llm: enableLlm }, { timeout: 300000 }),
-  listRuns: (limit = 20) => api.get("/benchmark/runs", { params: { limit, run_type: "synthetic" } }),
+  runCodeQLCorpus: (options = {}) =>
+    api.post(
+      "/benchmark/run-codeql-corpus",
+      {
+        enable_llm: options.enableLlm ?? false,
+        supported_only: options.supportedOnly ?? true,
+        line_tolerance: options.lineTolerance ?? 2,
+        roots: options.roots ?? null,
+        limit: options.limit ?? null,
+      },
+      { timeout: 900000 }
+    ),
+  startCodeQLCorpusJob: (options = {}) =>
+    api.post(
+      "/benchmark/run-codeql-corpus-job",
+      {
+        enable_llm: options.enableLlm ?? false,
+        supported_only: options.supportedOnly ?? true,
+        line_tolerance: options.lineTolerance ?? 2,
+        roots: options.roots ?? null,
+        limit: options.limit ?? null,
+      }
+    ),
+  getBenchmarkJob: (id) => api.get(`/benchmark/jobs/${id}`),
+  listRuns: (limit = 20, runType = "codeql-corpus") =>
+    api.get("/benchmark/runs", { params: { limit, run_type: runType } }),
   listFieldRuns: (limit = 20) => api.get("/benchmark/runs", { params: { limit, run_type: "field" } }),
   getRun: (id) => api.get(`/benchmark/runs/${id}`),
   leaderboard: () => api.get("/benchmark/leaderboard"),
