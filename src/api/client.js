@@ -6,9 +6,9 @@ const baseURL = process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000/api
 // Debug mode: set to true to see API requests/responses in console
 const DEBUG_API = process.env.NODE_ENV === "development";
 
-export const api = axios.create({ 
+export const api = axios.create({
   baseURL,
-  timeout: 30000, // 30 second timeout
+  timeout: 300000, // 5 minutes — benchmark jobs can run 3-5 min on the full corpus
   headers: {
     "Content-Type": "application/json",
   },
